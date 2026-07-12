@@ -479,24 +479,6 @@ body.pattern-mode .pattern-mode-action {
 .palette-swatch:hover { transform: scale(1.15); }
 .palette-swatch.active { border-color: var(--text); }
 
-.grid-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.grid-size-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.grid-size-label {
-  font-size: 12px;
-  font-weight: 600;
-  min-width: 50px;
-}
-
 .grid-slider {
   flex: 1;
   -webkit-appearance: none;
