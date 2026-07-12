@@ -663,9 +663,9 @@ body.pattern-mode .pattern-mode-action {
 #paletteOverlay .import-modal {
   width: min(440px, calc(100vw - 32px));
   padding: 30px;
-  gap: 22px;
+  gap: 18px;
   max-height: calc(100vh - 32px);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 #paletteOverlay .import-modal h3 {
@@ -673,7 +673,9 @@ body.pattern-mode .pattern-mode-action {
 }
 
 #paletteOverlay .custom-palette-editor {
-  gap: 16px;
+  gap: 14px;
+  min-height: 0;
+  flex: 1;
 }
 
 #paletteOverlay .custom-palette-name,
@@ -713,7 +715,13 @@ body.pattern-mode .pattern-mode-action {
 
 #paletteOverlay .custom-palette-swatches {
   gap: 10px;
-  padding-bottom: 18px;
+  padding: 12px 2px 14px;
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  align-content: flex-start;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 #paletteOverlay .custom-empty-msg {

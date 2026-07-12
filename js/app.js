@@ -661,13 +661,16 @@
       });
       container.appendChild(item);
     });
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
   }
 
   function openNewCustomPalette() {
     editingColors = [];
     editingLabels = [];
     editingKey = null;
-    paletteModalTitle.textContent = 'New Custom Palette';
+    paletteModalTitle.textContent = 'Own palette';
     document.getElementById('customPaletteName').value = '';
     document.getElementById('customColorPicker').value = '#E85D3A';
     document.getElementById('customColorHex').value = '#E85D3A';
@@ -678,6 +681,9 @@
     hexInputRow.style.display = 'none';
     renderCustomSwatches();
     paletteOverlay.classList.add('visible');
+    requestAnimationFrame(() => {
+      document.getElementById('customSwatches').scrollTop = document.getElementById('customSwatches').scrollHeight;
+    });
   }
 
   document.getElementById('addPaletteBtn').addEventListener('click', openNewCustomPalette);
@@ -688,7 +694,7 @@
     editingKey = activePaletteKey;
     editingColors = [...pal.colors];
     editingLabels = pal.labels ? [...pal.labels] : pal.colors.map(() => null);
-    paletteModalTitle.textContent = 'Edit: ' + pal.name;
+    paletteModalTitle.textContent = 'Edit: own palette';
     document.getElementById('customPaletteName').value = pal.name;
     document.getElementById('customColorPicker').value = '#E85D3A';
     document.getElementById('customColorHex').value = '#E85D3A';
@@ -700,6 +706,9 @@
     hexInputRow.style.display = hasDmc ? 'none' : '';
     renderCustomSwatches();
     paletteOverlay.classList.add('visible');
+    requestAnimationFrame(() => {
+      document.getElementById('customSwatches').scrollTop = document.getElementById('customSwatches').scrollHeight;
+    });
   });
 
   document.getElementById('customColorPicker').addEventListener('input', (e) => {
@@ -718,6 +727,9 @@
       editingColors.push(result.hex.toLowerCase());
       editingLabels.push(result.label);
       renderCustomSwatches();
+      requestAnimationFrame(() => {
+        document.getElementById('customSwatches').scrollTop = document.getElementById('customSwatches').scrollHeight;
+      });
     }
     dmcInput.value = '';
     dmcPreview.style.background = '#ccc';
@@ -730,6 +742,9 @@
       editingColors.push(hex.toLowerCase());
       editingLabels.push(null);
       renderCustomSwatches();
+      requestAnimationFrame(() => {
+        document.getElementById('customSwatches').scrollTop = document.getElementById('customSwatches').scrollHeight;
+      });
     }
   });
 
