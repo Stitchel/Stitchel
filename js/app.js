@@ -9,6 +9,8 @@
   } catch(e) {}
 
   let activePaletteKey = 'default';
+  let activePaletteRgbCache = null;
+  let activePaletteRgbCacheKey = null;
 
   function getActivePalette() {
     if (PALETTES[activePaletteKey]) return PALETTES[activePaletteKey];
@@ -17,8 +19,14 @@
     return PALETTES.default;
   }
 
+  function invalidatePaletteCache() {
+    activePaletteRgbCache = null;
+    activePaletteRgbCacheKey = null;
+  }
+
   function saveCustomPalettes() {
     try { localStorage.setItem('pixelStudio_customPalettes', JSON.stringify(customPalettes)); } catch(e) {}
+    invalidatePaletteCache();
   }
 
 
@@ -94,49 +102,61 @@
     }
   }
 
-  function getCellSize() {
+  function getFitScale() {
     const area = canvasArea.getBoundingClientRect();
-    const maxW = (area.width - 40);
-    const maxH = (area.height - 80);
-    const base = Math.min(maxW / gridW, maxH / gridH);
-    return Math.max(2, Math.floor(base * zoom));
+    const maxW = Math.max(1, area.width - 40);
+    const maxH = Math.max(1, area.height - 80);
+    return Math.min(maxW / gridW, maxH / gridH);
+  }
+
+  function getCanvasScale() {
+    return Math.max(0.01, getFitScale() * zoom);
+  }
+
+  function updateZoomLabel() {
+    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
   }
 
   function resizeCanvas() {
-    const cellSize = getCellSize();
-    const w = gridW * cellSize;
-    const h = gridH * cellSize;
-    canvas.width = w;
-    canvas.height = h;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
+    const scale = getCanvasScale();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = (gridW * scale) + 'px';
+    canvas.style.height = (gridH * scale) + 'px';
+    canvas.width = Math.max(1, Math.round(gridW * scale * dpr));
+    canvas.height = Math.max(1, Math.round(gridH * scale * dpr));
     draw();
   }
 
   function draw() {
-    const cellSize = getCellSize();
+    const scale = getCanvasScale();
     const w = canvas.width;
     const h = canvas.height;
+    const scaleX = w / gridW;
+    const scaleY = h / gridH;
+    const cellScale = Math.min(scaleX, scaleY);
 
+    ctx.imageSmoothingEnabled = false;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, gridW, gridH);
 
     // Pixels
     for (let y = 0; y < gridH; y++) {
       for (let x = 0; x < gridW; x++) {
         if (pixels[y][x]) {
           ctx.fillStyle = pixels[y][x];
-          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          ctx.fillRect(x, y, 1, 1);
           if (doneColors.has(pixels[y][x])) {
             ctx.fillStyle = 'rgba(255,255,255,0.25)';
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-            if (cellSize >= 8) {
+            ctx.fillRect(x, y, 1, 1);
+            if (scale >= 8) {
               ctx.strokeStyle = 'rgba(0,0,0,0.2)';
               ctx.lineWidth = 1;
               ctx.beginPath();
-              ctx.moveTo(x * cellSize, y * cellSize);
-              ctx.lineTo((x+1) * cellSize, (y+1) * cellSize);
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + 1, y + 1);
               ctx.stroke();
             }
           }
@@ -150,7 +170,7 @@
       for (const [px, py] of previewPixels) {
         if (px >= 0 && px < gridW && py >= 0 && py < gridH) {
           ctx.fillStyle = currentTool === 'eraser' ? '#FF000044' : currentColor;
-          ctx.fillRect(px * cellSize, py * cellSize, cellSize, cellSize);
+          ctx.fillRect(px, py, 1, 1);
         }
       }
       ctx.globalAlpha = 1;
@@ -162,26 +182,38 @@
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = currentTool === 'eraser' ? '#E85D3A' : currentColor;
       for (const [px, py] of footprint) {
-        ctx.fillRect(px * cellSize, py * cellSize, cellSize, cellSize);
+        ctx.fillRect(px, py, 1, 1);
       }
       ctx.globalAlpha = 1;
     }
 
     // Grid
-    if (showGrid && cellSize >= 4) {
-      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= gridW; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * cellSize + 0.5, 0);
-        ctx.lineTo(x * cellSize + 0.5, h);
-        ctx.stroke();
+    if (showGrid) {
+      const strokeGrid = (step, color, widthFactor) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = widthFactor / Math.max(scaleX, scaleY);
+        for (let x = 0; x <= gridW; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5 / scaleX, 0);
+          ctx.lineTo(x + 0.5 / scaleX, gridH);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= gridH; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y + 0.5 / scaleY);
+          ctx.lineTo(gridW, y + 0.5 / scaleY);
+          ctx.stroke();
+        }
+      };
+
+      if (cellScale >= 8) {
+        strokeGrid(1, 'rgba(0,0,0,0.08)', 1);
       }
-      for (let y = 0; y <= gridH; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * cellSize + 0.5);
-        ctx.lineTo(w, y * cellSize + 0.5);
-        ctx.stroke();
+      if (cellScale >= 1.5) {
+        strokeGrid(10, 'rgba(0,0,0,0.16)', 1.25);
+      }
+      if (gridW >= 100 || gridH >= 100) {
+        strokeGrid(100, 'rgba(0,0,0,0.28)', 1.75);
       }
     }
   }
@@ -205,8 +237,6 @@
     pixels = state.pixels.map(row => [...row]);
     gridW = state.gridW;
     gridH = state.gridH;
-    gridSlider.value = Math.max(gridW, gridH);
-    gridSizeLabel.textContent = gridW + ' × ' + gridH;
     hoverCell = null;
     resizeCanvas();
     buildStitchTracker();
@@ -238,9 +268,10 @@
 
   function getCell(e) {
     const rect = canvas.getBoundingClientRect();
-    const cellSize = getCellSize();
-    const x = Math.floor((e.clientX - rect.left) / cellSize);
-    const y = Math.floor((e.clientY - rect.top) / cellSize);
+    const cellSizeX = rect.width / gridW;
+    const cellSizeY = rect.height / gridH;
+    const x = Math.floor((e.clientX - rect.left) / cellSizeX);
+    const y = Math.floor((e.clientY - rect.top) / cellSizeY);
     return { x, y };
   }
 
@@ -449,7 +480,7 @@
     } else {
       zoom = Math.max(0.25, zoom / 1.15);
     }
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    updateZoomLabel();
     resizeCanvas();
   }, { passive: false });
 
@@ -786,27 +817,6 @@
     setColor(closestPalette(r, g, b));
   });
 
-  // Grid slider
-  const gridSlider = document.getElementById('gridSlider');
-  const gridSizeLabel = document.getElementById('gridSizeLabel');
-  gridSlider.addEventListener('input', () => {
-    const newSize = parseInt(gridSlider.value);
-    gridSizeLabel.textContent = newSize + ' × ' + newSize;
-  });
-  gridSlider.addEventListener('change', () => {
-    const newSize = parseInt(gridSlider.value);
-    if (newSize === gridW && newSize === gridH) return;
-    saveState();
-    ensurePixelCapacity(newSize, newSize);
-    gridW = newSize;
-    gridH = newSize;
-    zoom = 1;
-    document.getElementById('zoomLabel').textContent = '100%';
-    hoverCell = null;
-    resizeCanvas();
-    buildStitchTracker();
-  });
-
   // Grid toggle
   const gridToggle = document.getElementById('gridToggle');
   gridToggle.addEventListener('click', () => {
@@ -817,10 +827,12 @@
 
   // Mirror toggle
   const mirrorToggle = document.getElementById('mirrorToggle');
-  mirrorToggle.addEventListener('click', () => {
-    mirrorX = !mirrorX;
-    mirrorToggle.classList.toggle('on', mirrorX);
-  });
+  if (mirrorToggle) {
+    mirrorToggle.addEventListener('click', () => {
+      mirrorX = !mirrorX;
+      mirrorToggle.classList.toggle('on', mirrorX);
+    });
+  }
 
   // Stitch tracker
   function buildStitchTracker() {
@@ -878,17 +890,17 @@
   // Zoom buttons
   document.getElementById('zoomIn').addEventListener('click', () => {
     zoom = Math.min(8, zoom * 1.25);
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    updateZoomLabel();
     resizeCanvas();
   });
   document.getElementById('zoomOut').addEventListener('click', () => {
     zoom = Math.max(0.25, zoom / 1.25);
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    updateZoomLabel();
     resizeCanvas();
   });
   document.getElementById('zoomFit').addEventListener('click', () => {
     zoom = 1;
-    document.getElementById('zoomLabel').textContent = '100%';
+    updateZoomLabel();
     resizeCanvas();
   });
 
@@ -932,9 +944,8 @@
   function reverseDmcLookup(hex) {
     if (!hex) return '';
     const h = hex.toLowerCase();
-    for (const [num, val] of Object.entries(DMC)) {
-      if (val.toLowerCase() === h) return num;
-    }
+    const exactMap = getReverseDmcLookupMap();
+    if (exactMap.has(h)) return exactMap.get(h);
     const rgb = hexToRgb(hex);
     let best = '', bestDist = Infinity;
     for (const [num, val] of Object.entries(DMC)) {
@@ -942,7 +953,18 @@
       const d = (rgb[0]-pr[0])**2 + (rgb[1]-pr[1])**2 + (rgb[2]-pr[2])**2;
       if (d < bestDist) { bestDist = d; best = num; }
     }
+    exactMap.set(h, best);
     return best;
+  }
+
+  let reverseDmcLookupMap = null;
+  function getReverseDmcLookupMap() {
+    if (reverseDmcLookupMap) return reverseDmcLookupMap;
+    reverseDmcLookupMap = new Map();
+    for (const [num, val] of Object.entries(DMC)) {
+      reverseDmcLookupMap.set(val.toLowerCase(), num);
+    }
+    return reverseDmcLookupMap;
   }
 
   function luminance(hex) {
@@ -963,229 +985,433 @@
   }
 
   document.getElementById('exportPatternBtn').addEventListener('click', () => {
+    const reverseMap = getReverseDmcLookupMap();
     const usedColors = {};
     for (let y = 0; y < gridH; y++) {
       for (let x = 0; x < gridW; x++) {
         const c = pixels[y][x];
         if (c && !usedColors[c]) {
-          usedColors[c] = reverseDmcLookup(c);
+          usedColors[c] = reverseMap.get(c.toLowerCase()) || reverseDmcLookup(c);
         }
       }
     }
 
+    const sorted = Object.entries(usedColors).sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
     const cellPx = 24;
-    const fontSize = 8;
-    const colsPerPage = Math.min(gridW, Math.floor(680 / cellPx));
-    const rowsPerPage = Math.min(gridH, Math.floor(900 / cellPx));
+    const axisPx = cellPx;
+    const previewCellPx = cellPx;
+    const previewW = gridW * previewCellPx;
+    const previewH = gridH * previewCellPx;
+    const topAxisCells = Array.from({ length: gridW }, (_, x) => '<td class="screen-ax screen-ax-col" style="width:' + previewCellPx + 'px;min-width:' + previewCellPx + 'px;max-width:' + previewCellPx + 'px;height:' + axisPx + 'px;min-height:' + axisPx + 'px;max-height:' + axisPx + 'px">' + (x + 1) + '</td>').join('');
+    const leftAxisRows = Array.from({ length: gridH }, (_, y) => '<tr><td class="screen-ax screen-ax-row" style="width:' + axisPx + 'px;min-width:' + axisPx + 'px;max-width:' + axisPx + 'px;height:' + previewCellPx + 'px;min-height:' + previewCellPx + 'px;max-height:' + previewCellPx + 'px">' + (y + 1) + '</td></tr>').join('');
+    const printData = {
+      gridW,
+      gridH,
+      cellPx,
+      axisPx,
+      previewCellPx,
+      previewW,
+      previewH,
+      pixels,
+      usedColors,
+      sorted
+    };
 
-    let html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
-    html += '<title>Cross-Stitch Pattern</title>';
-    html += '<style>';
-    html += '*{box-sizing:border-box}';
-    html += 'body{margin:0;font-family:"SF Mono","Consolas",monospace;color:#2C2416;background:#F5F0E8}';
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Cross-Stitch Pattern</title>
+<style>
+html,body{height:100%;overflow:hidden}
+*{box-sizing:border-box}
+body{margin:0;font-family:"SF Mono","Consolas",monospace;color:#2C2416;background:#F5F0E8}
+.view-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #D4CDB8;background:#FFFDF7}
+.view-bar h2{font-size:14px;margin:0}
+.view-bar .info{font-size:10px;color:#666;margin:0}
+.view-bar button{padding:6px 14px;border:1px solid #ccc;border-radius:5px;background:#fff;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.view-bar button:hover{background:#f0f0f0}
+.view-bar .print-btn{background:#3b5dc9;color:#fff;border-color:#3b5dc9}
+.view-bar .print-btn:hover{background:#2d4ea5}
+.view-layout{display:flex;height:calc(100vh - 52px)}
+.legend-panel{width:200px;border-left:1px solid #D4CDB8;display:flex;flex-direction:column;overflow:hidden;padding:16px 12px;flex-shrink:0;background:#FFFDF7;min-height:0}
+.legend-panel h2{font-size:14px;margin:0 0 14px;color:#2C2416;flex-shrink:0}
+.legend-panel h3{font-size:11px;margin:0 0 12px;color:#8A7E6B;text-transform:uppercase;letter-spacing:1px;flex-shrink:0;padding-bottom:10px;border-bottom:1px solid rgba(212,205,184,0.75)}
+#legendItems{overflow-y:auto;min-height:0;flex:1;padding-top:10px}
+.leg-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;padding:6px;border-radius:6px;transition:background 0.15s;user-select:none;color:#2C2416}
+.leg-item:hover{background:#F5F0E8}
+.leg-item.active{background:#FFF0EC;outline:2px solid #E85D3A;outline-offset:-1px}
+.leg-item.done{opacity:0.45;text-decoration:line-through}
+.leg-item.done .leg-check{background:#E85D3A;border-color:#D04A28}
+.leg-item.done .leg-check::after{content:"✓";color:#fff;font-size:12px}
+.leg-check{width:18px;height:18px;border-radius:4px;border:2px solid #D4CDB8;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.leg-swatch{width:22px;height:22px;border-radius:5px;border:1px solid #D4CDB8;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+.grid-shell{position:relative;flex:1;min-width:0;min-height:0;background:#F5F0E8;overflow:hidden}
+.grid-viewport{position:absolute;inset:0;overflow:auto;background:#F5F0E8;scrollbar-gutter:stable both-edges}
+.grid-sizer{width:${previewW}px;height:${previewH}px}
+.grid-canvas{position:absolute;top:${axisPx}px;left:${axisPx}px;right:0;bottom:0;display:block;pointer-events:none;background:#fff;z-index:1}
+.grid-corner{position:absolute;top:0;left:0;width:${axisPx}px;height:${axisPx}px;background:#f0f0f0;z-index:40;border-right:1px solid #ccc;border-bottom:1px solid #ccc;pointer-events:none}
+.grid-top-axis{position:absolute;top:0;left:${axisPx}px;right:0;height:${axisPx}px;overflow:hidden;background:#f0f0f0;z-index:39;border-bottom:1px solid #ccc;pointer-events:none}
+.grid-left-axis{position:absolute;top:${axisPx}px;left:0;bottom:0;width:${axisPx}px;overflow:hidden;background:#f0f0f0;z-index:38;border-right:1px solid #ccc;pointer-events:none}
+.grid-top-axis-inner,.grid-left-axis-inner{position:relative;overflow:visible;will-change:transform}
+.screen-ax{background:#f0f0f0 !important;background-image:none !important;color:#888;font-size:7px;font-weight:600;border:1px solid #ccc;position:relative;z-index:3;background-clip:padding-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+.screen-ax-col{border-bottom:1px solid #ccc}
+.screen-ax-row{border-right:1px solid #ccc}
+.screen-ax-corner{border-right:1px solid #ccc;border-bottom:1px solid #ccc}
+.grid-table-wrap{position:relative;display:inline-block;background:#fff;box-shadow:0 4px 20px rgba(44,36,22,0.12)}
+.grid-guides,.axis-guides-x,.axis-guides-y{position:absolute;inset:0;pointer-events:none;z-index:1}
+.grid-guides{background-image:repeating-linear-gradient(to right, transparent 0, transparent ${(cellPx * 10) - 3}px, rgba(168,154,126,1) ${(cellPx * 10) - 3}px, rgba(168,154,126,1) ${cellPx * 10}px),repeating-linear-gradient(to bottom, transparent 0, transparent ${(cellPx * 10) - 3}px, rgba(168,154,126,1) ${(cellPx * 10) - 3}px, rgba(168,154,126,1) ${cellPx * 10}px)}
+table{border-collapse:collapse;table-layout:fixed;background:#fff}
+td{width:${cellPx}px;min-width:${cellPx}px;max-width:${cellPx}px;height:${cellPx}px;min-height:${cellPx}px;max-height:${cellPx}px;text-align:center;vertical-align:middle;font-size:8px;font-weight:700;border:1px solid #bbb;line-height:1;padding:0;overflow:hidden;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+.ax{background:#f0f0f0 !important;background-image:none !important;color:#888;font-size:7px;font-weight:600;border:1px solid #ccc;position:relative;z-index:3;background-clip:padding-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+.ax-col{border-bottom:1px solid #ccc}
+.ax-row{border-right:1px solid #ccc}
+.ax-corner{border-right:1px solid #ccc;border-bottom:1px solid #ccc}
+.print-sections{display:none}
+.section{margin-bottom:16px}
+.section-title{font-size:10px;font-weight:700;color:#888;margin-bottom:4px}
+.print-legend{display:none}
+@media print{
+.view-bar,.view-layout{display:none!important}
+.print-sections{display:block!important}
+.print-legend{display:block!important;page-break-before:always;padding:16px}
+.section{page-break-inside:avoid}
+body{padding:10px}
+td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+}
+</style></head><body>
+<div class="view-bar">
+  <div><h2>Cross-Stitch Pattern</h2><div class="info">${gridW} &times; ${gridH} stitches &middot; ${sorted.length} colors</div></div>
+</div>
+<div class="view-layout">
+  <div class="grid-shell">
+    <canvas class="grid-canvas" id="patternCanvas"></canvas>
+    <div class="grid-viewport" id="gridViewport">
+      <div class="grid-sizer" id="gridSizer"></div>
+    </div>
+    <div class="grid-corner"></div>
+    <div class="grid-top-axis"><div class="grid-top-axis-inner" id="gridTopAxis"><div class="axis-guides-x"></div><table><tr>${topAxisCells}</tr></table></div></div>
+    <div class="grid-left-axis"><div class="grid-left-axis-inner" id="gridLeftAxis"><div class="axis-guides-y"></div><table>${leftAxisRows}</table></div></div>  </div>
+  <div class="legend-panel" id="legendPanel">
+    <h2>Progress Tracker</h2>
+    <h3>Colors <span id="doneCount">0</span>/${sorted.length}</h3>
+    <div id="legendItems"></div>
+  </div>
+</div>
+<div class="print-sections" id="printSections"></div>
+<script>
+(function() {
+  var data = null;
+  var patternCanvas = null;
+  var gridViewport = null;
+  var gridSizer = null;
+  var gridTopAxis = null;
+  var gridLeftAxis = null;
+  var legendPanel = null;
+  var legendItems = null;
+  var doneCount = null;
+  var printSections = null;
+  var ctx = null;
+  var activeColor = null;
+  var doneColors = new Set();
+  var drawRaf = 0;
+  var printBuilt = false;
+  var resizeObserver = null;
 
-    html += '.view-bar{display:none}';
-    html += '.view-bar h2{font-size:14px;margin:0}';
-    html += '.view-bar .info{font-size:10px;color:#666;margin:0}';
-    html += '.view-bar button{padding:6px 14px;border:1px solid #ccc;border-radius:5px;background:#fff;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}';
-    html += '.view-bar button:hover{background:#f0f0f0}';
-    html += '.view-bar .print-btn{background:#3b5dc9;color:#fff;border-color:#3b5dc9}';
-    html += '.view-bar .print-btn:hover{background:#2d4ea5}';
+  function hexToRgb(hex) {
+    var value = hex.replace('#', '');
+    if (value.length === 3) {
+      value = value[0] + value[0] + value[1] + value[1] + value[2] + value[2];
+    }
+    var num = parseInt(value, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
 
-    html += '.view-layout{display:flex;height:100vh}';
-    html += '.grid-scroll{flex:1;overflow:auto;padding:20px;background:#F5F0E8;position:relative}';
-    html += '.legend-panel{width:200px;border-left:1px solid #D4CDB8;overflow-y:auto;padding:16px 12px;flex-shrink:0;background:#FFFDF7}';
-    html += '.legend-panel h2{font-size:14px;margin:0 0 14px;color:#2C2416}';
-    html += '.legend-panel h3{font-size:11px;margin:0 0 10px;color:#8A7E6B;text-transform:uppercase;letter-spacing:1px}';
-    html += '.leg-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;padding:6px;border-radius:6px;transition:background 0.15s;user-select:none;color:#2C2416}';
-    html += '.leg-item:hover{background:#F5F0E8}';
-    html += '.leg-item.active{background:#FFF0EC;outline:2px solid #E85D3A;outline-offset:-1px}';
-    html += '.leg-item.done{opacity:0.45;text-decoration:line-through}';
-    html += '.leg-item.done .leg-check{background:#E85D3A;border-color:#D04A28}';
-    html += '.leg-item.done .leg-check::after{content:"✓";color:#fff;font-size:12px}';
-    html += '.leg-check{width:18px;height:18px;border-radius:4px;border:2px solid #D4CDB8;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}';
-    html += '.leg-swatch{width:22px;height:22px;border-radius:5px;border:1px solid #D4CDB8;flex-shrink:0;';
-    html += '-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}';
+  function luminance(hex) {
+    var rgb = hexToRgb(hex);
+    return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+  }
 
-    html += '.grid-shell{position:relative;flex:1;min-width:0;min-height:0;background:#F5F0E8}';
-    html += '.grid-viewport{position:absolute;inset:0;overflow:auto;padding-top:'+cellPx+'px;padding-left:'+cellPx+'px;background:#F5F0E8}';
-    html += '.grid-corner{position:absolute;top:0;left:0;width:'+cellPx+'px;height:'+cellPx+'px;background:#f0f0f0;z-index:30;border-right:1px solid #ccc;border-bottom:1px solid #ccc}';
-    html += '.grid-top-axis{position:absolute;top:0;left:'+cellPx+'px;right:0;height:'+cellPx+'px;overflow:hidden;background:#f0f0f0;z-index:29;border-bottom:1px solid #ccc}';
-    html += '.grid-left-axis{position:absolute;top:'+cellPx+'px;left:0;bottom:0;width:'+cellPx+'px;overflow:hidden;background:#f0f0f0;z-index:28;border-right:1px solid #ccc}';
-    html += '.grid-top-axis-inner,.grid-left-axis-inner{will-change:transform;position:relative}';
-    html += '.grid-table-wrap{position:relative;display:inline-block;background:#fff;box-shadow:0 4px 20px rgba(44,36,22,0.12)}';
-    html += '.grid-body-wrap{position:relative;display:inline-block;background:#fff;box-shadow:0 4px 20px rgba(44,36,22,0.12)}';
-    html += '.grid-guides,.axis-guides-x,.axis-guides-y{position:absolute;inset:0;pointer-events:none;z-index:1}';
-    html += '.grid-guides{background-image:repeating-linear-gradient(to right, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px),repeating-linear-gradient(to bottom, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px)}';
-    html += '.axis-guides-x{background-image:repeating-linear-gradient(to right, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px)}';
-    html += '.axis-guides-y{background-image:repeating-linear-gradient(to bottom, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px)}';
-    html += 'table{border-collapse:collapse;table-layout:fixed;background:#fff}';
-    html += 'td{width:'+cellPx+'px;min-width:'+cellPx+'px;max-width:'+cellPx+'px;height:'+cellPx+'px;min-height:'+cellPx+'px;max-height:'+cellPx+'px;';
-    html += 'text-align:center;vertical-align:middle;font-size:'+fontSize+'px;font-weight:700;border:1px solid #bbb;line-height:1;padding:0;overflow:hidden;white-space:nowrap;';
-    html += '-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}';
-    html += '.ax{background:#f0f0f0 !important;background-image:none !important;color:#888;font-size:'+(fontSize-1)+'px;font-weight:600;border:1px solid #ccc;position:relative;z-index:3;background-clip:padding-box;';
-    html += '-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}';
-    html += '.ax-col{border-bottom:1px solid #ccc}';
-    html += '.ax-row{border-right:1px solid #ccc}';
-    html += '.ax-corner{border-right:1px solid #ccc;border-bottom:1px solid #ccc}';
+  function guideLineStyle(x, y) {
+    var shadows = [];
+    var guideColor = 'rgba(168, 154, 126, 1)';
+    if ((x + 1) % 10 === 0) shadows.push('border-right:3px solid ' + guideColor);
+    if ((y + 1) % 10 === 0) shadows.push('border-bottom:3px solid ' + guideColor);
+    return shadows.join('');
+  }
 
-    html += '.print-sections{display:none}';
-    html += '.section{margin-bottom:16px}';
-    html += '.section-title{font-size:10px;font-weight:700;color:#888;margin-bottom:4px}';
-    html += '.print-legend{display:none}';
+  function setCanvasSize() {
+    if (!patternCanvas || !gridViewport) return;
+    var dpr = window.devicePixelRatio || 1;
+    var maxCanvasPx = 8192;
+    var width = Math.max(1, gridViewport.clientWidth - data.axisPx);
+    var height = Math.max(1, gridViewport.clientHeight - data.axisPx);
+    width = Math.min(width, Math.floor(maxCanvasPx / dpr));
+    height = Math.min(height, Math.floor(maxCanvasPx / dpr));
+    patternCanvas.width = Math.max(1, Math.round(width * dpr));
+    patternCanvas.height = Math.max(1, Math.round(height * dpr));
+    patternCanvas.style.width = width + 'px';
+    patternCanvas.style.height = height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+  }
 
-    html += '@media print{';
-    html += '.view-bar,.view-layout{display:none!important}';
-    html += '.print-sections{display:block!important}';
-    html += '.print-legend{display:block!important;page-break-before:always;padding:16px}';
-    html += '.section{page-break-inside:avoid}';
-    html += 'body{padding:10px}';
-    html += 'td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}';
-    html += '</style></head><body>';
+  function scheduleDraw() {
+    if (drawRaf) return;
+    drawRaf = requestAnimationFrame(function() {
+      drawRaf = 0;
+      draw();
+    });
+  }
 
-    // Top bar
-    html += '<div class="view-bar">';
-    html += '<div><h2>Cross-Stitch Pattern</h2>';
-    html += '<div class="info">'+gridW+' &times; '+gridH+' stitches &middot; '+Object.keys(usedColors).length+' colors</div></div>';
-    html += '<button class="print-btn" onclick="window.print()">Save as PDF</button>';
-    html += '</div>';
+  function draw() {
+    if (!data || !ctx || !gridViewport) return;
 
-    // Screen view: full grid + legend sidebar
-    html += '<div class="view-layout">';
-    html += '<div class="grid-shell">';
-    html += '<div class="grid-viewport" id="gridViewport">';
-    html += '<div class="grid-body-wrap"><div class="grid-guides"></div><table>';
-    for (let y = 0; y < gridH; y++) {
-      html += '<tr>';
-      for (let x = 0; x < gridW; x++) {
-        const c = pixels[y][x];
-        const bdr = '';
-        if (c) {
-          const dmc = usedColors[c] || '';
-          const textColor = luminance(c) > 140 ? '#000' : '#fff';
-          html += '<td data-c="'+c+'" style="background:'+c+';color:'+textColor+';'+bdr+'">'+dmc+'</td>';
+    var cellPx = data.previewCellPx;
+    var gridW = data.gridW;
+    var gridH = data.gridH;
+    var pixels = data.pixels;
+    var dpr = window.devicePixelRatio || 1;
+    var canvasW = patternCanvas.clientWidth;
+    var canvasH = patternCanvas.clientHeight;
+    var scrollLeft = gridViewport.scrollLeft;
+    var scrollTop = gridViewport.scrollTop;
+    var visibleRight = Math.max(0, scrollLeft + canvasW);
+    var visibleBottom = Math.max(0, scrollTop + canvasH);
+
+
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    ctx.font = '700 8px "SF Mono","Consolas",monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 1;
+
+    var firstCol = Math.max(0, Math.floor(scrollLeft / cellPx));
+    var lastCol = Math.min(gridW - 1, Math.ceil(visibleRight / cellPx));
+    var firstRow = Math.max(0, Math.floor(scrollTop / cellPx));
+    var lastRow = Math.min(gridH - 1, Math.ceil(visibleBottom / cellPx));
+
+    for (var y = firstRow; y <= lastRow; y++) {
+      var rawY = y * cellPx - scrollTop;
+      var cellY = Math.round(rawY * dpr) / dpr;
+      for (var x = firstCol; x <= lastCol; x++) {
+        var color = pixels[y][x];
+        var rawX = x * cellPx - scrollLeft;
+        var cellX = Math.round(rawX * dpr) / dpr;
+        var alpha = (activeColor && color && color !== activeColor && !doneColors.has(color)) ? 0.12 : 1;
+        if (color) {
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.fillRect(cellX, cellY, cellPx, cellPx);
+          ctx.strokeStyle = 'rgba(187, 187, 187, ' + alpha + ')';
+          ctx.strokeRect(cellX + 0.5, cellY + 0.5, cellPx - 1, cellPx - 1);
+          ctx.globalAlpha = 1;
+          var text = data.usedColors[color] || '';
+          if (text && cellPx >= 12 && !doneColors.has(color)) {
+            ctx.fillStyle = luminance(color) > 140 ? 'rgba(0,0,0,' + alpha + ')' : 'rgba(255,255,255,' + alpha + ')';
+            ctx.fillText(text, cellX + cellPx / 2, cellY + cellPx / 2);
+          }
         } else {
-          html += '<td style="'+bdr+'"></td>';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(cellX, cellY, cellPx, cellPx);
+          ctx.strokeStyle = 'rgba(187, 187, 187, 1)';
+          ctx.strokeRect(cellX + 0.5, cellY + 0.5, cellPx - 1, cellPx - 1);
         }
       }
-      html += '</tr>';
     }
-    html += '</table></div></div>';
-    html += '<div class="grid-corner"></div>';
-    html += '<div class="grid-top-axis"><div class="grid-top-axis-inner" id="gridTopAxis"><div class="axis-guides-x"></div><table><tr>';
-    for (let x = 0; x < gridW; x++) {
-      const hbdr = '';
-      html += '<td class="ax ax-col" style="'+hbdr+'">'+(x+1)+'</td>';
-    }
-    html += '</tr></table></div></div>';
-    html += '<div class="grid-left-axis"><div class="grid-left-axis-inner" id="gridLeftAxis"><div class="axis-guides-y"></div><table>';
-    for (let y = 0; y < gridH; y++) {
-      const rowStyle = '';
-      html += '<tr><td class="ax ax-row" style="'+rowStyle+'">'+(y+1)+'</td></tr>';
-    }
-    html += '</table></div></div>';
-    html += '</div>';
 
-    // Legend sidebar
-    html += '<div class="legend-panel">';
-    html += '<h2>Progress Tracker</h2>';
-    html += '<h3>Colors <span id="doneCount">0</span>/'+Object.keys(usedColors).length+'</h3>';
-    const sorted = Object.entries(usedColors).sort((a,b) => a[1].localeCompare(b[1], undefined, {numeric:true}));
-    for (const [hex, dmc] of sorted) {
-      html += '<div class="leg-item" data-c="'+hex+'"><div class="leg-check"></div><div class="leg-swatch" style="background:'+hex+'"></div><span class="leg-label">'+dmc+'</span></div>';
+    ctx.strokeStyle = 'rgba(168, 154, 126, 1)';
+    ctx.lineWidth = 3;
+    for (var gx = ((firstCol / 10) | 0) * 10 + 9; gx < gridW && gx <= lastCol + 10; gx += 10) {
+      var guideX = Math.round((((gx + 1) * cellPx) - scrollLeft) * dpr) / dpr;
+      ctx.beginPath();
+      ctx.moveTo(guideX, 0);
+      ctx.lineTo(guideX, canvasH);
+      ctx.stroke();
     }
-    html += '</div></div>';
+    for (var gy = ((firstRow / 10) | 0) * 10 + 9; gy < gridH && gy <= lastRow + 10; gy += 10) {
+      var guideY = Math.round((((gy + 1) * cellPx) - scrollTop) * dpr) / dpr;
+      ctx.beginPath();
+      ctx.moveTo(0, guideY);
+      ctx.lineTo(canvasW, guideY);
+      ctx.stroke();
+    }
+  }
 
-    // Print-only: paginated sections
-    html += '<div class="print-sections">';
+  function updateDoneCount() {
+    if (doneCount) doneCount.textContent = String(doneColors.size);
+  }
+
+  function setActive(hex) {
+    activeColor = activeColor === hex ? null : hex;
+    var items = legendItems.querySelectorAll('.leg-item');
+    items.forEach(function(item) {
+      item.classList.toggle('active', !!activeColor && item.dataset.c === activeColor);
+    });
+    scheduleDraw();
+  }
+
+  function toggleDone(hex, item) {
+    if (doneColors.has(hex)) {
+      doneColors.delete(hex);
+      item.classList.remove('done');
+    } else {
+      doneColors.add(hex);
+      item.classList.add('done');
+    }
+    updateDoneCount();
+    scheduleDraw();
+  }
+
+  function buildLegend() {
+    if (!legendItems || !data) return;
+    var frag = document.createDocumentFragment();
+    data.sorted.forEach(function(entry) {
+      var hex = entry[0];
+      var dmc = entry[1];
+      var row = document.createElement('div');
+      row.className = 'leg-item';
+      row.dataset.c = hex;
+      row.innerHTML = '<div class="leg-check"></div><div class="leg-swatch" style="background:' + hex + '"></div><span class="leg-label">' + dmc + '</span>';
+      row.addEventListener('click', function(e) {
+        var isCheck = !!e.target.closest('.leg-check');
+        if (isCheck) {
+          toggleDone(hex, row);
+          return;
+        }
+        setActive(hex);
+      });
+      frag.appendChild(row);
+    });
+    legendItems.innerHTML = '';
+    legendItems.appendChild(frag);
+    updateDoneCount();
+  }
+
+  function buildPrintSections() {
+    if (!data || !printSections) return;
+    printSections.innerHTML = '';
+
+    var gridW = data.gridW;
+    var gridH = data.gridH;
+    var pixels = data.pixels;
+    var usedColors = data.usedColors;
+    var sorted = data.sorted;
+    var cellPx = data.cellPx;
+    var colsPerPage = Math.min(gridW, Math.floor(680 / cellPx));
+    var rowsPerPage = Math.min(gridH, Math.floor(900 / cellPx));
+    var html = '';
+
     html += '<h2 style="font-size:13px;margin:0 0 4px">Cross-Stitch Pattern</h2>';
-    html += '<div style="font-size:10px;color:#666;margin-bottom:10px">'+gridW+' &times; '+gridH+' stitches &middot; '+Object.keys(usedColors).length+' colors</div>';
+    html += '<div style="font-size:10px;color:#666;margin-bottom:10px">' + gridW + ' &times; ' + gridH + ' stitches &middot; ' + sorted.length + ' colors</div>';
 
-    let pageNum = 0;
-    for (let startY = 0; startY < gridH; startY += rowsPerPage) {
-      for (let startX = 0; startX < gridW; startX += colsPerPage) {
+    var pageNum = 0;
+    for (var startY = 0; startY < gridH; startY += rowsPerPage) {
+      for (var startX = 0; startX < gridW; startX += colsPerPage) {
         pageNum++;
-        const endX = Math.min(startX + colsPerPage, gridW);
-        const endY = Math.min(startY + rowsPerPage, gridH);
+        var endX = Math.min(startX + colsPerPage, gridW);
+        var endY = Math.min(startY + rowsPerPage, gridH);
         html += '<div class="section">';
-        html += '<div class="section-title">Section '+pageNum+': Col '+(startX+1)+'–'+endX+', Row '+(startY+1)+'–'+endY+'</div>';
+        html += '<div class="section-title">Section ' + pageNum + ': Col ' + (startX + 1) + '–' + endX + ', Row ' + (startY + 1) + '–' + endY + '</div>';
         html += '<div class="grid-table-wrap"><div class="grid-guides"></div><table><tr><td class="ax"></td>';
-        for (let x = startX; x < endX; x++) {
-          const hb = printGuideLineShadows(x, startY);
-          html += '<td class="ax" style="'+hb+'">'+(x+1)+'</td>';
+        for (var x = startX; x < endX; x++) {
+          html += '<td class="ax" style="' + guideLineStyle(x, startY) + '">' + (x + 1) + '</td>';
         }
         html += '</tr>';
-        for (let y = startY; y < endY; y++) {
-          const rt = printGuideLineShadows(startX, y);
-          html += '<tr><td class="ax" style="'+rt+'">'+(y+1)+'</td>';
-          for (let x = startX; x < endX; x++) {
-            const c=pixels[y][x];
-            const bd = printGuideLineShadows(x, y);
+        for (var y = startY; y < endY; y++) {
+          html += '<tr><td class="ax" style="' + guideLineStyle(startX, y) + '">' + (y + 1) + '</td>';
+          for (var x2 = startX; x2 < endX; x2++) {
+            var c = pixels[y][x2];
+            var bd = guideLineStyle(x2, y);
             if (c) {
-              const dm=usedColors[c]||'';
-              const tc=luminance(c)>140?'#000':'#fff';
-              html+='<td style="background:'+c+';color:'+tc+';'+bd+'">'+dm+'</td>';
-            } else html+='<td style="'+bd+'"></td>';
+              var dm = usedColors[c] || '';
+              var tc = luminance(c) > 140 ? '#000' : '#fff';
+              html += '<td style="background:' + c + ';color:' + tc + ';' + bd + '">' + dm + '</td>';
+            } else {
+              html += '<td style="' + bd + '"></td>';
+            }
           }
           html += '</tr>';
         }
         html += '</table></div></div>';
       }
     }
-    html += '</div>';
 
-    // Print-only legend
-    html += '<div class="print-legend"><h3 style="font-size:13px;margin:0 0 10px">Color Key ('+Object.keys(usedColors).length+' colors)</h3>';
+    html += '<div class="print-legend"><h3 style="font-size:13px;margin:0 0 10px">Color Key (' + sorted.length + ' colors)</h3>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">';
-    for (const [hex, dmc] of sorted) {
-      html += '<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600"><div class="leg-swatch" style="background:'+hex+'"></div>'+dmc+'</div>';
+    for (var i = 0; i < sorted.length; i++) {
+      var hex = sorted[i][0];
+      var dmc = sorted[i][1];
+      html += '<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600"><div class="leg-swatch" style="background:' + hex + '"></div>' + dmc + '</div>';
     }
     html += '</div></div>';
 
-    // Highlight + done script
-    html += '<script>';
-    html += 'var doneColors={};';
-    html += 'function updateDoneCount(){document.getElementById("doneCount").textContent=Object.keys(doneColors).length}';
-    html += 'function applyDone(){';
-    html += '  document.querySelectorAll("td[data-c]").forEach(function(td){';
-    html += '    if(doneColors[td.dataset.c]){td.dataset.orig=td.dataset.orig||td.textContent;td.textContent="";td.style.filter="";td.style.opacity="1"}';
-    html += '    else if(td.dataset.orig!==undefined){td.textContent=td.dataset.orig;td.style.filter="";td.style.opacity=""}';
-    html += '  });';
-    html += '}';
-    html += 'var gridViewport=document.getElementById("gridViewport");';
-    html += 'var gridTopAxis=document.getElementById("gridTopAxis");';
-    html += 'var gridLeftAxis=document.getElementById("gridLeftAxis");';
-    html += 'function syncGridAxes(){';
-    html += '  if(!gridViewport)return;';
-    html += '  if(gridTopAxis)gridTopAxis.style.transform="translateX("+(-gridViewport.scrollLeft)+"px)";';
-    html += '  if(gridLeftAxis)gridLeftAxis.style.transform="translateY("+(-gridViewport.scrollTop)+"px)";';
-    html += '}';
-    html += 'if(gridViewport){gridViewport.addEventListener("scroll",syncGridAxes);syncGridAxes();}';
-    html += 'document.querySelector(".legend-panel").addEventListener("click",function(e){';
-    html += '  var item=e.target.closest(".leg-item");if(!item)return;';
-    html += '  var c=item.dataset.c;';
-    html += '  if(e.target.closest(".leg-check")){';
-    html += '    if(doneColors[c]){delete doneColors[c];item.classList.remove("done")}';
-    html += '    else{doneColors[c]=true;item.classList.add("done")}';
-    html += '    updateDoneCount();applyDone();return;';
-    html += '  }';
-    html += '  var active=item.classList.contains("active");';
-    html += '  document.querySelectorAll(".leg-item").forEach(function(el){el.classList.remove("active")});';
-    html += '  var cells=document.querySelectorAll("td[data-c]");';
-    html += '  if(active){';
-    html += '    cells.forEach(function(td){td.style.opacity="1";td.style.outline="none";td.style.boxShadow="";td.style.zIndex="";td.style.position=""});';
-    html += '  }else{';
-    html += '    item.classList.add("active");';
-    html += '    cells.forEach(function(td){';
-    html += '      if(td.dataset.c===c){';
-    html += '        td.style.opacity="1";td.style.outline="none";td.style.boxShadow="";td.style.zIndex="";td.style.position=""';
-    html += '      }else{td.style.opacity=doneColors[td.dataset.c]?"1":"0.12";td.style.outline="none";td.style.boxShadow="";td.style.zIndex="";td.style.position=""}';
-    html += '    });';
-    html += '  }';
-    html += '});';
-    html += '<\/script>';
+    printSections.innerHTML = html;
+  }
 
-    html += '</body></html>';
+  function printPattern() {
+    buildPrintSections();
+    requestAnimationFrame(function() {
+      window.print();
+    });
+  }
+
+  function initPatternView() {
+    data = window.__patternData;
+    if (!data) return;
+
+    patternCanvas = document.getElementById('patternCanvas');
+    gridViewport = document.getElementById('gridViewport');
+    gridSizer = document.getElementById('gridSizer');
+    gridTopAxis = document.getElementById('gridTopAxis');
+    gridLeftAxis = document.getElementById('gridLeftAxis');
+    legendPanel = document.getElementById('legendPanel');
+    legendItems = document.getElementById('legendItems');
+    doneCount = document.getElementById('doneCount');
+    printSections = document.getElementById('printSections');
+    ctx = patternCanvas.getContext('2d');
+
+    if (gridSizer) {
+      gridSizer.style.width = data.previewW + 'px';
+      gridSizer.style.height = data.previewH + 'px';
+    }
+
+    buildLegend();
+    setCanvasSize();
+    scheduleDraw();
+
+    window.addEventListener('resize', function() {
+      setCanvasSize();
+      scheduleDraw();
+    });
+
+    if (window.ResizeObserver) {
+      resizeObserver = new ResizeObserver(function() {
+        setCanvasSize();
+        scheduleDraw();
+      });
+      resizeObserver.observe(gridViewport);
+    }
+
+    function syncGridAxes() {
+      if (gridTopAxis) gridTopAxis.style.transform = 'translateX(' + (-gridViewport.scrollLeft) + 'px)';
+      if (gridLeftAxis) gridLeftAxis.style.transform = 'translateY(' + (-gridViewport.scrollTop) + 'px)';
+    }
+
+    gridViewport.addEventListener('scroll', function() {
+      syncGridAxes();
+      scheduleDraw();
+    }, { passive: true });
+    syncGridAxes();
+
+    window.addEventListener('beforeprint', buildPrintSections);
+  }
+
+  window.initPatternView = initPatternView;
+  window.printPattern = printPattern;
+})();
+</script>
+</body></html>`;
 
     const oldFrame = document.getElementById('patternFrame');
     if (oldFrame) oldFrame.remove();
@@ -1194,6 +1420,14 @@
     frame.className = 'pattern-frame';
     frame.title = 'Cross-Stitch Pattern';
     frame.srcdoc = html;
+    frame.addEventListener('load', () => {
+      if (frame.contentWindow) {
+        frame.contentWindow.__patternData = printData;
+        if (typeof frame.contentWindow.initPatternView === 'function') {
+          frame.contentWindow.initPatternView();
+        }
+      }
+    });
     document.querySelector('.main-layout').appendChild(frame);
     document.body.classList.add('pattern-mode');
   });
@@ -1207,7 +1441,11 @@
 
   document.getElementById('savePatternBtn').addEventListener('click', () => {
     const frame = document.getElementById('patternFrame');
-    if (frame && frame.contentWindow) frame.contentWindow.print();
+    if (frame && frame.contentWindow && typeof frame.contentWindow.printPattern === 'function') {
+      frame.contentWindow.printPattern();
+    } else if (frame && frame.contentWindow) {
+      frame.contentWindow.print();
+    }
   });
 
   // Keyboard shortcuts
@@ -1258,12 +1496,18 @@
   let importedImage = null;
   let snapToPalette = true;
   let keepRatio = false;
+  let importPreviewRaf = null;
 
   const importOverlay = document.getElementById('importOverlay');
   const importPreview = document.getElementById('importPreview');
   const importPreviewCtx = importPreview.getContext('2d');
   const snapToggle = document.getElementById('snapToggle');
   const importSizeSelect = document.getElementById('importSize');
+  const importSizeInput = document.getElementById('importSizeValue');
+  const importSizeCount = document.getElementById('importSizeCount');
+  const IMPORT_PREVIEW_TARGET_EDGE = 240;
+  const IMPORT_PREVIEW_MAX_W = 360;
+  const IMPORT_PREVIEW_MAX_H = 280;
 
   function hexToRgb(hex) {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -1276,20 +1520,29 @@
     return '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
   }
 
-  function colorDistance(a, b) {
-    return (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2;
+  function clampImportSize(value) {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) return 16;
+    return Math.min(600, Math.max(16, parsed));
+  }
+
+  function colorDistance(r1, g1, b1, r2, g2, b2) {
+    return (r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2;
   }
 
   function closestPalette(r, g, b) {
     const pal = getActivePalette();
-    const colors = pal.colors;
+    if (!activePaletteRgbCache || activePaletteRgbCacheKey !== activePaletteKey || activePaletteRgbCache.length !== pal.colors.length) {
+      activePaletteRgbCache = pal.colors.map(hex => ({ hex, rgb: hexToRgb(hex) }));
+      activePaletteRgbCacheKey = activePaletteKey;
+    }
     let best = 0, bestDist = Infinity;
-    for (let i = 0; i < colors.length; i++) {
-      const pr = hexToRgb(colors[i]);
-      const d = colorDistance([r, g, b], pr);
+    for (let i = 0; i < activePaletteRgbCache.length; i++) {
+      const prgb = activePaletteRgbCache[i].rgb;
+      const d = colorDistance(r, g, b, prgb[0], prgb[1], prgb[2]);
       if (d < bestDist) { bestDist = d; best = i; }
     }
-    return colors[best];
+    return activePaletteRgbCache[best].hex;
   }
 
   function getImportDims(maxEdge) {
@@ -1307,25 +1560,49 @@
     return { w, h };
   }
 
+  function fitToTargetEdge(w, h, targetEdge, maxW, maxH) {
+    const edge = Math.max(w, h);
+    const scale = Math.min(targetEdge / edge, maxW / w, maxH / h);
+    return {
+      w: Math.max(1, Math.round(w * scale)),
+      h: Math.max(1, Math.round(h * scale))
+    };
+  }
+
+  function scheduleImportPreviewUpdate() {
+    if (!importedImage) return;
+    if (importPreviewRaf) return;
+    importPreviewRaf = requestAnimationFrame(() => {
+      importPreviewRaf = null;
+      updateImportPreview();
+    });
+  }
+
+  function drawImportedImage(ctx, img, dims) {
+    if (keepRatio) {
+      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, dims.w, dims.h);
+      return;
+    }
+
+    const aspect = img.width / img.height;
+    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+    if (aspect > 1) { sx = (img.width - img.height) / 2; sw = img.height; }
+    else if (aspect < 1) { sy = (img.height - img.width) / 2; sh = img.width; }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
+  }
+
   function updateImportPreview() {
     if (!importedImage) return;
-    const maxEdge = parseInt(importSizeSelect.value);
+    const maxEdge = clampImportSize(importSizeSelect.value);
+    importSizeSelect.value = String(maxEdge);
+    importSizeInput.value = String(maxEdge);
     const dims = getImportDims(maxEdge);
     importPreview.width = dims.w;
     importPreview.height = dims.h;
     importPreviewCtx.imageSmoothingEnabled = true;
     importPreviewCtx.imageSmoothingQuality = 'medium';
 
-    const img = importedImage;
-    if (keepRatio) {
-      importPreviewCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, dims.w, dims.h);
-    } else {
-      const aspect = img.width / img.height;
-      let sx = 0, sy = 0, sw = img.width, sh = img.height;
-      if (aspect > 1) { sx = (img.width - img.height) / 2; sw = img.height; }
-      else if (aspect < 1) { sy = (img.height - img.width) / 2; sh = img.width; }
-      importPreviewCtx.drawImage(img, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
-    }
+    drawImportedImage(importPreviewCtx, importedImage, dims);
 
     if (snapToPalette) {
       const imgData = importPreviewCtx.getImageData(0, 0, dims.w, dims.h);
@@ -1337,13 +1614,10 @@
       importPreviewCtx.putImageData(imgData, 0, 0);
     }
 
-    const scale = Math.min(200 / dims.w, 200 / dims.h);
-    const displayW = Math.max(dims.w, Math.floor(dims.w * scale));
-    const displayH = Math.max(dims.h, Math.floor(dims.h * scale));
-    importPreview.style.width = displayW + 'px';
-    importPreview.style.height = displayH + 'px';
-
-    document.getElementById('importSizeLabel').textContent = keepRatio ? 'Longest edge (' + dims.w + '×' + dims.h + ')' : 'Canvas size';
+    const previewDims = fitToTargetEdge(dims.w, dims.h, IMPORT_PREVIEW_TARGET_EDGE, IMPORT_PREVIEW_MAX_W, IMPORT_PREVIEW_MAX_H);
+    importPreview.style.width = previewDims.w + 'px';
+    importPreview.style.height = previewDims.h + 'px';
+    importSizeCount.textContent = keepRatio ? (dims.w + ' × ' + dims.h) : (maxEdge + ' × ' + maxEdge);
   }
 
   document.getElementById('importBtn').addEventListener('click', () => {
@@ -1357,10 +1631,10 @@
     function onImageReady(img) {
       importedImage = img;
       const longest = Math.max(gridW, gridH);
-      const opts = Array.from(importSizeSelect.options).map(o => parseInt(o.value));
-      const best = opts.reduce((a, b) => Math.abs(b - longest) < Math.abs(a - longest) ? b : a);
-      importSizeSelect.value = String(best);
-      updateImportPreview();
+      const initialSize = clampImportSize(longest);
+      importSizeSelect.value = String(initialSize);
+      importSizeInput.value = String(initialSize);
+      scheduleImportPreviewUpdate();
       importOverlay.classList.add('visible');
     }
 
@@ -1397,26 +1671,45 @@
   snapToggle.addEventListener('click', () => {
     snapToPalette = !snapToPalette;
     snapToggle.classList.toggle('on', snapToPalette);
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
 
   const ratioToggle = document.getElementById('ratioToggle');
   ratioToggle.addEventListener('click', () => {
     keepRatio = !keepRatio;
     ratioToggle.classList.toggle('on', keepRatio);
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
 
-  importSizeSelect.addEventListener('change', updateImportPreview);
+  importSizeSelect.addEventListener('input', () => {
+    importSizeInput.value = importSizeSelect.value;
+    scheduleImportPreviewUpdate();
+  });
+  importSizeInput.addEventListener('input', () => {
+    if (importSizeInput.value.trim() === '') return;
+    const value = clampImportSize(importSizeInput.value);
+    importSizeSelect.value = String(value);
+    scheduleImportPreviewUpdate();
+  });
+  importSizeInput.addEventListener('change', () => {
+    const value = clampImportSize(importSizeInput.value);
+    importSizeInput.value = String(value);
+    importSizeSelect.value = String(value);
+    scheduleImportPreviewUpdate();
+  });
 
   document.getElementById('importCancel').addEventListener('click', () => {
+    if (importPreviewRaf) {
+      cancelAnimationFrame(importPreviewRaf);
+      importPreviewRaf = null;
+    }
     importOverlay.classList.remove('visible');
     importedImage = null;
   });
 
   document.getElementById('importConfirm').addEventListener('click', () => {
     if (!importedImage) return;
-    const maxEdge = parseInt(importSizeSelect.value);
+    const maxEdge = clampImportSize(importSizeSelect.value);
     const dims = getImportDims(maxEdge);
 
     saveState();
@@ -1432,16 +1725,7 @@
     tmpCtx.imageSmoothingEnabled = true;
     tmpCtx.imageSmoothingQuality = 'medium';
 
-    const img = importedImage;
-    if (keepRatio) {
-      tmpCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, dims.w, dims.h);
-    } else {
-      const aspect = img.width / img.height;
-      let sx = 0, sy = 0, sw = img.width, sh = img.height;
-      if (aspect > 1) { sx = (img.width - img.height) / 2; sw = img.height; }
-      else if (aspect < 1) { sy = (img.height - img.width) / 2; sh = img.width; }
-      tmpCtx.drawImage(img, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
-    }
+    drawImportedImage(tmpCtx, importedImage, dims);
 
     const imgData = tmpCtx.getImageData(0, 0, dims.w, dims.h);
     const d = imgData.data;
@@ -1460,10 +1744,8 @@
       }
     }
 
-    gridSlider.value = Math.max(dims.w, dims.h);
-    gridSizeLabel.textContent = dims.w + ' × ' + dims.h;
     zoom = 1;
-    document.getElementById('zoomLabel').textContent = '100%';
+    updateZoomLabel();
     undoStack = [];
     redoStack = [];
 
