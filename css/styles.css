@@ -159,17 +159,18 @@ body.pattern-mode .pattern-mode-action {
 }
 .tool-btn svg { width: 20px; height: 20px; }
 .tool-menu-wrap {
-  width: 40px;
+  width: 46px;
   height: 40px;
   position: relative;
-  flex: 0 0 40px;
+  flex: 0 0 46px;
 }
 .tool-menu-wrap > .tool-btn .tooltip { display: none; }
 .brush-size-menu {
   display: none;
   position: absolute;
-  left: 46px;
+  left: 40px;
   top: 0;
+  margin-left: 0;
   grid-template-columns: repeat(4, 32px);
   gap: 4px;
   padding: 6px;

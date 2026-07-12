@@ -935,6 +935,18 @@
     return 0.299*r + 0.587*g + 0.114*b;
   }
 
+  function guideLineShadows(x, y) {
+    return '';
+  }
+
+  function printGuideLineShadows(x, y) {
+    const shadows = [];
+    const guideColor = 'rgba(168, 154, 126, 1)';
+    if ((x + 1) % 10 === 0) shadows.push('border-right:3px solid ' + guideColor);
+    if ((y + 1) % 10 === 0) shadows.push('border-bottom:3px solid ' + guideColor);
+    return shadows.join('');
+  }
+
   document.getElementById('exportPatternBtn').addEventListener('click', () => {
     const usedColors = {};
     for (let y = 0; y < gridH; y++) {
@@ -966,29 +978,41 @@
     html += '.view-bar .print-btn:hover{background:#2d4ea5}';
 
     html += '.view-layout{display:flex;height:100vh}';
-    html += '.grid-scroll{flex:1;overflow:auto;padding:20px;background:#F5F0E8}';
-    html += '.legend-panel{width:240px;border-left:1px solid #D4CDB8;overflow-y:auto;padding:20px 16px;flex-shrink:0;background:#FFFDF7}';
-    html += '.legend-panel h2{font-size:16px;margin:0 0 18px;color:#2C2416}';
-    html += '.legend-panel h3{font-size:13px;margin:0 0 14px;color:#8A7E6B;text-transform:uppercase;letter-spacing:1px}';
-    html += '.leg-item{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;cursor:pointer;padding:8px;border-radius:6px;transition:background 0.15s;user-select:none;color:#2C2416}';
+    html += '.grid-scroll{flex:1;overflow:auto;padding:20px;background:#F5F0E8;position:relative}';
+    html += '.legend-panel{width:200px;border-left:1px solid #D4CDB8;overflow-y:auto;padding:16px 12px;flex-shrink:0;background:#FFFDF7}';
+    html += '.legend-panel h2{font-size:14px;margin:0 0 14px;color:#2C2416}';
+    html += '.legend-panel h3{font-size:11px;margin:0 0 10px;color:#8A7E6B;text-transform:uppercase;letter-spacing:1px}';
+    html += '.leg-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;padding:6px;border-radius:6px;transition:background 0.15s;user-select:none;color:#2C2416}';
     html += '.leg-item:hover{background:#F5F0E8}';
     html += '.leg-item.active{background:#FFF0EC;outline:2px solid #E85D3A;outline-offset:-1px}';
     html += '.leg-item.done{opacity:0.45;text-decoration:line-through}';
     html += '.leg-item.done .leg-check{background:#E85D3A;border-color:#D04A28}';
     html += '.leg-item.done .leg-check::after{content:"✓";color:#fff;font-size:12px}';
-    html += '.leg-check{width:20px;height:20px;border-radius:4px;border:2px solid #D4CDB8;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}';
-    html += '.leg-swatch{width:26px;height:26px;border-radius:5px;border:1px solid #D4CDB8;flex-shrink:0;';
+    html += '.leg-check{width:18px;height:18px;border-radius:4px;border:2px solid #D4CDB8;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}';
+    html += '.leg-swatch{width:22px;height:22px;border-radius:5px;border:1px solid #D4CDB8;flex-shrink:0;';
     html += '-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}';
 
-    html += 'table{border-collapse:collapse;background:#fff;box-shadow:0 4px 20px rgba(44,36,22,0.12)}';
-    html += 'td{width:'+cellPx+'px;height:'+cellPx+'px;text-align:center;vertical-align:middle;';
-    html += 'font-size:'+fontSize+'px;font-weight:700;border:1px solid #bbb;line-height:1;padding:0;overflow:hidden;';
+    html += '.grid-shell{position:relative;flex:1;min-width:0;min-height:0;background:#F5F0E8}';
+    html += '.grid-viewport{position:absolute;inset:0;overflow:auto;padding-top:'+cellPx+'px;padding-left:'+cellPx+'px;background:#F5F0E8}';
+    html += '.grid-corner{position:absolute;top:0;left:0;width:'+cellPx+'px;height:'+cellPx+'px;background:#f0f0f0;z-index:30;border-right:1px solid #ccc;border-bottom:1px solid #ccc}';
+    html += '.grid-top-axis{position:absolute;top:0;left:'+cellPx+'px;right:0;height:'+cellPx+'px;overflow:hidden;background:#f0f0f0;z-index:29;border-bottom:1px solid #ccc}';
+    html += '.grid-left-axis{position:absolute;top:'+cellPx+'px;left:0;bottom:0;width:'+cellPx+'px;overflow:hidden;background:#f0f0f0;z-index:28;border-right:1px solid #ccc}';
+    html += '.grid-top-axis-inner,.grid-left-axis-inner{will-change:transform;position:relative}';
+    html += '.grid-table-wrap{position:relative;display:inline-block;background:#fff;box-shadow:0 4px 20px rgba(44,36,22,0.12)}';
+    html += '.grid-body-wrap{position:relative;display:inline-block;background:#fff;box-shadow:0 4px 20px rgba(44,36,22,0.12)}';
+    html += '.grid-guides,.axis-guides-x,.axis-guides-y{position:absolute;inset:0;pointer-events:none;z-index:1}';
+    html += '.grid-guides{background-image:repeating-linear-gradient(to right, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px),repeating-linear-gradient(to bottom, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px)}';
+    html += '.axis-guides-x{background-image:repeating-linear-gradient(to right, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px)}';
+    html += '.axis-guides-y{background-image:repeating-linear-gradient(to bottom, transparent 0, transparent '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10 - 3)+'px, rgba(168,154,126,1) '+(cellPx * 10)+'px)}';
+    html += 'table{border-collapse:collapse;table-layout:fixed;background:#fff}';
+    html += 'td{width:'+cellPx+'px;min-width:'+cellPx+'px;max-width:'+cellPx+'px;height:'+cellPx+'px;min-height:'+cellPx+'px;max-height:'+cellPx+'px;';
+    html += 'text-align:center;vertical-align:middle;font-size:'+fontSize+'px;font-weight:700;border:1px solid #bbb;line-height:1;padding:0;overflow:hidden;white-space:nowrap;';
     html += '-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}';
-    html += '.ax{background:#f0f0f0 !important;color:#888;font-size:'+(fontSize-1)+'px;font-weight:600;border:1px solid #ccc;position:sticky;';
+    html += '.ax{background:#f0f0f0 !important;background-image:none !important;color:#888;font-size:'+(fontSize-1)+'px;font-weight:600;border:1px solid #ccc;position:relative;z-index:3;background-clip:padding-box;';
     html += '-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}';
-    html += '.ax-col{top:0;z-index:2}';
-    html += '.ax-row{left:0;z-index:1}';
-    html += '.ax-corner{top:0;left:0;z-index:3}';
+    html += '.ax-col{border-bottom:1px solid #ccc}';
+    html += '.ax-row{border-right:1px solid #ccc}';
+    html += '.ax-corner{border-right:1px solid #ccc;border-bottom:1px solid #ccc}';
 
     html += '.print-sections{display:none}';
     html += '.section{margin-bottom:16px}';
@@ -1013,26 +1037,14 @@
 
     // Screen view: full grid + legend sidebar
     html += '<div class="view-layout">';
-    html += '<div class="grid-scroll"><table>';
-
-    html += '<tr><td class="ax ax-corner"></td>';
-    for (let x = 0; x < gridW; x++) {
-      let hbdr = '';
-      if ((x+1) % 10 === 0) hbdr += 'border-right:2px solid #333;';
-      if (x % 10 === 0) hbdr += 'border-left:2px solid #333;';
-      html += '<td class="ax ax-col" style="'+hbdr+'">'+(x+1)+'</td>';
-    }
-    html += '</tr>';
-
+    html += '<div class="grid-shell">';
+    html += '<div class="grid-viewport" id="gridViewport">';
+    html += '<div class="grid-body-wrap"><div class="grid-guides"></div><table>';
     for (let y = 0; y < gridH; y++) {
-      const rowBot = (y+1) % 10 === 0 ? 'border-bottom:2px solid #333;' : '';
-      const rowTop = y % 10 === 0 ? 'border-top:2px solid #333;' : '';
-      html += '<tr><td class="ax ax-row" style="'+rowTop+rowBot+'">'+(y+1)+'</td>';
+      html += '<tr>';
       for (let x = 0; x < gridW; x++) {
         const c = pixels[y][x];
-        let bdr = rowTop + rowBot;
-        if ((x+1) % 10 === 0) bdr += 'border-right:2px solid #333;';
-        if (x % 10 === 0) bdr += 'border-left:2px solid #333;';
+        const bdr = '';
         if (c) {
           const dmc = usedColors[c] || '';
           const textColor = luminance(c) > 140 ? '#000' : '#fff';
@@ -1043,7 +1055,21 @@
       }
       html += '</tr>';
     }
-    html += '</table></div>';
+    html += '</table></div></div>';
+    html += '<div class="grid-corner"></div>';
+    html += '<div class="grid-top-axis"><div class="grid-top-axis-inner" id="gridTopAxis"><div class="axis-guides-x"></div><table><tr>';
+    for (let x = 0; x < gridW; x++) {
+      const hbdr = '';
+      html += '<td class="ax ax-col" style="'+hbdr+'">'+(x+1)+'</td>';
+    }
+    html += '</tr></table></div></div>';
+    html += '<div class="grid-left-axis"><div class="grid-left-axis-inner" id="gridLeftAxis"><div class="axis-guides-y"></div><table>';
+    for (let y = 0; y < gridH; y++) {
+      const rowStyle = '';
+      html += '<tr><td class="ax ax-row" style="'+rowStyle+'">'+(y+1)+'</td></tr>';
+    }
+    html += '</table></div></div>';
+    html += '</div>';
 
     // Legend sidebar
     html += '<div class="legend-panel">';
@@ -1068,23 +1094,18 @@
         const endY = Math.min(startY + rowsPerPage, gridH);
         html += '<div class="section">';
         html += '<div class="section-title">Section '+pageNum+': Col '+(startX+1)+'–'+endX+', Row '+(startY+1)+'–'+endY+'</div>';
-        html += '<table><tr><td class="ax"></td>';
+        html += '<div class="grid-table-wrap"><div class="grid-guides"></div><table><tr><td class="ax"></td>';
         for (let x = startX; x < endX; x++) {
-          let hb='';
-          if ((x+1)%10===0) hb+='border-right:2px solid #333;';
-          if (x%10===0) hb+='border-left:2px solid #333;';
+          const hb = printGuideLineShadows(x, startY);
           html += '<td class="ax" style="'+hb+'">'+(x+1)+'</td>';
         }
         html += '</tr>';
         for (let y = startY; y < endY; y++) {
-          const rb=(y+1)%10===0?'border-bottom:2px solid #333;':'';
-          const rt=y%10===0?'border-top:2px solid #333;':'';
-          html += '<tr><td class="ax" style="'+rt+rb+'">'+(y+1)+'</td>';
+          const rt = printGuideLineShadows(startX, y);
+          html += '<tr><td class="ax" style="'+rt+'">'+(y+1)+'</td>';
           for (let x = startX; x < endX; x++) {
             const c=pixels[y][x];
-            let bd=rt+rb;
-            if ((x+1)%10===0) bd+='border-right:2px solid #333;';
-            if (x%10===0) bd+='border-left:2px solid #333;';
+            const bd = printGuideLineShadows(x, y);
             if (c) {
               const dm=usedColors[c]||'';
               const tc=luminance(c)>140?'#000':'#fff';
@@ -1093,7 +1114,7 @@
           }
           html += '</tr>';
         }
-        html += '</table></div>';
+        html += '</table></div></div>';
       }
     }
     html += '</div>';
@@ -1116,6 +1137,15 @@
     html += '    else if(td.dataset.orig!==undefined){td.textContent=td.dataset.orig;td.style.filter="";td.style.opacity=""}';
     html += '  });';
     html += '}';
+    html += 'var gridViewport=document.getElementById("gridViewport");';
+    html += 'var gridTopAxis=document.getElementById("gridTopAxis");';
+    html += 'var gridLeftAxis=document.getElementById("gridLeftAxis");';
+    html += 'function syncGridAxes(){';
+    html += '  if(!gridViewport)return;';
+    html += '  if(gridTopAxis)gridTopAxis.style.transform="translateX("+(-gridViewport.scrollLeft)+"px)";';
+    html += '  if(gridLeftAxis)gridLeftAxis.style.transform="translateY("+(-gridViewport.scrollTop)+"px)";';
+    html += '}';
+    html += 'if(gridViewport){gridViewport.addEventListener("scroll",syncGridAxes);syncGridAxes();}';
     html += 'document.querySelector(".legend-panel").addEventListener("click",function(e){';
     html += '  var item=e.target.closest(".leg-item");if(!item)return;';
     html += '  var c=item.dataset.c;';
@@ -1133,13 +1163,7 @@
     html += '    item.classList.add("active");';
     html += '    cells.forEach(function(td){';
     html += '      if(td.dataset.c===c){';
-    html += '        var table=td.closest("table"),r=td.parentElement.rowIndex,col=td.cellIndex,sh=[];';
-    html += '        function same(rr,cc){return table.rows[rr]&&table.rows[rr].cells[cc]&&table.rows[rr].cells[cc].dataset.c===c}';
-    html += '        if(!same(r-1,col))sh.push("inset 0 2px #333");';
-    html += '        if(!same(r+1,col))sh.push("inset 0 -2px #333");';
-    html += '        if(!same(r,col-1))sh.push("inset 2px 0 #333");';
-    html += '        if(!same(r,col+1))sh.push("inset -2px 0 #333");';
-    html += '        td.style.opacity="1";td.style.outline="none";td.style.boxShadow=sh.join(",");td.style.zIndex="1";td.style.position="relative"';
+    html += '        td.style.opacity="1";td.style.outline="none";td.style.boxShadow="";td.style.zIndex="";td.style.position=""';
     html += '      }else{td.style.opacity=doneColors[td.dataset.c]?"1":"0.12";td.style.outline="none";td.style.boxShadow="";td.style.zIndex="";td.style.position=""}';
     html += '    });';
     html += '  }';
