@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stitchel</title>
+<link rel="stylesheet" href="css/styles.css?v=10">
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    Stitchel
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="undoBtn" title="Undo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h13a4 4 0 0 1 0 8H7"/><path d="M3 10l4-4M3 10l4 4"/></svg>
+    </button>
+    <button class="btn" id="redoBtn" title="Redo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H8a4 4 0 0 0 0 8h9"/><path d="M21 10l-4-4M21 10l-4 4"/></svg>
+    </button>
+    <button class="btn" id="clearBtn">Clear</button>
+    <button class="btn" id="importBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import
+    </button>
+    <input type="file" id="importFile" accept="image/*,.heic,.heif">
+    <button class="btn btn-accent" id="exportBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      PNG
+    </button>
+    <button class="btn btn-accent" id="exportPatternBtn" style="background:#3b5dc9;border-color:#3b5dc9">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="10" y1="4" x2="10" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/></svg>
+      Pattern
+    </button>
+    <button class="btn pattern-mode-action" id="exitPatternBtn" style="display:none">Back to editor</button>
+    <button class="btn btn-accent pattern-mode-action" id="savePatternBtn" style="display:none;background:#3b5dc9;border-color:#3b5dc9">Save as PDF</button>
+  </div>
+</header>
+
+<div class="main-layout">
+  <div class="toolbar" id="toolbar">
+    <div class="tool-menu-wrap">
+      <button class="tool-btn active" data-tool="pencil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        <span class="tooltip">Pencil <span class="shortcut-hint">B</span></span>
+      </button>
+      <div class="brush-size-menu" aria-label="Pencil size">
+        <button class="brush-size-btn active" data-size="1" data-brush-tool="pencil" title="1 pixel"><span class="brush-dot" style="width:4px;height:4px"></span></button>
+        <button class="brush-size-btn" data-size="2" data-brush-tool="pencil" title="2 pixels"><span class="brush-dot" style="width:8px;height:8px"></span></button>
+        <button class="brush-size-btn" data-size="3" data-brush-tool="pencil" title="3 pixels"><span class="brush-dot" style="width:12px;height:12px"></span></button>
+        <button class="brush-size-btn" data-size="4" data-brush-tool="pencil" title="4 pixels"><span class="brush-dot" style="width:16px;height:16px"></span></button>
+      </div>
+    </div>
+    <div class="tool-menu-wrap">
+      <button class="tool-btn" data-tool="eraser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16a1 1 0 0 1 0-1.4l9.6-9.6a1 1 0 0 1 1.4 0l7 7a1 1 0 0 1 0 1.4L16 18"/></svg>
+        <span class="tooltip">Eraser <span class="shortcut-hint">E</span></span>
+      </button>
+      <div class="brush-size-menu" aria-label="Eraser size">
+        <button class="brush-size-btn active" data-size="1" data-brush-tool="eraser" title="1 pixel"><span class="brush-dot" style="width:4px;height:4px"></span></button>
+        <button class="brush-size-btn" data-size="2" data-brush-tool="eraser" title="2 pixels"><span class="brush-dot" style="width:8px;height:8px"></span></button>
+        <button class="brush-size-btn" data-size="3" data-brush-tool="eraser" title="3 pixels"><span class="brush-dot" style="width:12px;height:12px"></span></button>
+        <button class="brush-size-btn" data-size="4" data-brush-tool="eraser" title="4 pixels"><span class="brush-dot" style="width:16px;height:16px"></span></button>
+      </div>
+    </div>
+    <button class="tool-btn" data-tool="fill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="M14 6l4-4 4 4-4 4"/><path d="M19 15c1 1 2 2 2 3.5a2.5 2.5 0 0 1-5 0c0-1.5 1-2.5 2-3.5z" fill="currentColor"/></svg>
+      <span class="tooltip">Fill <span class="shortcut-hint">G</span></span>
+    </button>
+    <button class="tool-btn" data-tool="eyedropper">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l1-1h3l7-7"/><path d="M3 21v-3l7-7"/><circle cx="17" cy="7" r="4"/></svg>
+      <span class="tooltip">Eyedropper <span class="shortcut-hint">I</span></span>
+    </button>
+    <button class="tool-btn" data-tool="line">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>
+      <span class="tooltip">Line <span class="shortcut-hint">L</span></span>
+    </button>
+    <button class="tool-btn" data-tool="rect">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>
+      <span class="tooltip">Rectangle <span class="shortcut-hint">R</span></span>
+    </button>
+  </div>
+
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="pixelCanvas"></canvas>
+    </div>
+    <div class="coords-bar" id="coordsBar">0, 0</div>
+  </div>
+
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-title">Color</div>
+      <div class="color-current">
+        <div class="color-preview" id="colorPreview">
+          <div class="color-preview-fg" id="colorPreviewFg"></div>
+          <input type="color" id="colorInput" value="#2C2416">
+        </div>
+        <input type="text" class="color-hex" id="colorHex" value="#2C2416" maxlength="7">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="palette-header">
+        <div class="panel-title">Palette</div>
+        <div class="palette-actions">
+          <button class="palette-action-btn" id="editPaletteBtn" title="Edit palette" style="display:none;font-size:12px">&#9998;</button>
+          <button class="palette-action-btn" id="addPaletteBtn" title="New custom palette">+</button>
+          <button class="palette-action-btn danger" id="delPaletteBtn" title="Delete palette" style="display:none">×</button>
+        </div>
+      </div>
+      <select class="palette-select" id="paletteSelect">
+        <option value="default">Pixel Art (36)</option>
+        <option value="dmc">DMC Thread (48)</option>
+      </select>
+      <div class="palette-grid" id="paletteGrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Canvas</div>
+      <div class="grid-controls">
+        <div class="grid-size-row">
+          <span class="grid-size-label" id="gridSizeLabel">32 × 32</span>
+          <input type="range" class="grid-slider" id="gridSlider" min="8" max="100" step="1" value="32">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="toggle-row">
+        <span>Grid Lines</span>
+        <button class="toggle on" id="gridToggle"></button>
+      </div>
+      <div class="toggle-row" style="margin-top:4px">
+        <span>Symmetry X</span>
+        <button class="toggle" id="mirrorToggle"></button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Zoom</div>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomOut">−</button>
+        <span class="zoom-label" id="zoomLabel">100%</span>
+        <button class="zoom-btn" id="zoomIn">+</button>
+        <button class="zoom-btn" id="zoomFit" title="Fit" style="font-size:11px">⊡</button>
+      </div>
+    </div>
+
+    <div class="panel" id="stitchPanel" style="display:none">
+      <div class="palette-header">
+        <div class="panel-title">Stitch Tracker</div>
+        <div class="stitch-progress" id="stitchProgress">0/0</div>
+      </div>
+      <div class="stitch-tracker" id="stitchTracker"></div>
+    </div>
+  </div>
+</div>
+
+<div class="import-modal-overlay" id="paletteOverlay">
+  <div class="import-modal">
+    <h3 id="paletteModalTitle">New Custom Palette</h3>
+    <div class="custom-palette-editor">
+      <input type="text" class="custom-palette-name" id="customPaletteName" placeholder="Palette name" maxlength="30">
+      <div class="import-option" style="margin-bottom:2px">
+        <span>Add by</span>
+        <select id="colorMode" style="font-family:inherit;font-size:11px;font-weight:600;padding:3px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);">
+          <option value="dmc">DMC Number</option>
+          <option value="hex">Hex Color</option>
+        </select>
+      </div>
+      <div class="custom-color-row" id="dmcInputRow">
+        <input type="text" class="custom-color-hex" id="dmcNumberInput" placeholder="e.g. 310" maxlength="10" style="width:70px">
+        <div id="dmcPreviewSwatch" style="width:28px;height:28px;border-radius:4px;border:2px solid var(--border);background:#ccc;flex-shrink:0"></div>
+        <button class="btn" id="addDmcBtn" style="padding:5px 10px;font-size:11px">Add</button>
+      </div>
+      <div class="custom-color-row" id="hexInputRow" style="display:none">
+        <input type="color" class="custom-color-input" id="customColorPicker" value="#E85D3A">
+        <input type="text" class="custom-color-hex" id="customColorHex" value="#E85D3A" maxlength="7">
+        <button class="btn" id="addColorBtn" style="padding:5px 10px;font-size:11px">Add</button>
+      </div>
+      <div class="custom-palette-swatches" id="customSwatches">
+        <span class="custom-empty-msg">Add DMC numbers to build your palette</span>
+      </div>
+    </div>
+    <div class="import-actions">
+      <button class="btn" id="paletteCancel">Cancel</button>
+      <button class="btn btn-accent" id="paletteSave">Save Palette</button>
+    </div>
+  </div>
+</div>
+
+<div class="import-modal-overlay" id="importOverlay">
+  <div class="import-modal">
+    <h3>Import Image</h3>
+    <div class="import-preview-wrap">
+      <canvas id="importPreview"></canvas>
+    </div>
+    <div class="import-option">
+      <span>Snap to palette</span>
+      <button class="toggle on" id="snapToggle"></button>
+    </div>
+    <div class="import-option">
+      <span>Keep original ratio</span>
+      <button class="toggle" id="ratioToggle"></button>
+    </div>
+    <div class="import-option">
+      <span id="importSizeLabel">Canvas size</span>
+      <select id="importSize" style="font-family:inherit;font-size:12px;font-weight:600;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);">
+        <option value="16">16 × 16</option>
+        <option value="24">24 × 24</option>
+        <option value="32" selected>32 × 32</option>
+        <option value="48">48 × 48</option>
+        <option value="64">64 × 64</option>
+        <option value="80">80 × 80</option>
+        <option value="100">100 × 100</option>
+      </select>
+    </div>
+    <div class="import-actions">
+      <button class="btn" id="importCancel">Cancel</button>
+      <button class="btn btn-accent" id="importConfirm">Pixelate</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/palettes.js"></script>
+<script src="js/app.js?v=9"></script>
+</body>
+</html>
