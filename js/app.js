@@ -1291,6 +1291,8 @@
   const importPreviewCtx = importPreview.getContext('2d');
   const snapToggle = document.getElementById('snapToggle');
   const importSizeSelect = document.getElementById('importSize');
+  const importSizeInput = document.getElementById('importSizeValue');
+  const importSizeCount = document.getElementById('importSizeCount');
   const IMPORT_PREVIEW_TARGET_EDGE = 240;
   const IMPORT_PREVIEW_MAX_W = 360;
   const IMPORT_PREVIEW_MAX_H = 280;
@@ -1304,6 +1306,12 @@
 
   function rgbToHex(r, g, b) {
     return '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+  }
+
+  function clampImportSize(value) {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) return 16;
+    return Math.min(600, Math.max(16, parsed));
   }
 
   function colorDistance(a, b) {
@@ -1361,7 +1369,9 @@
 
   function updateImportPreview() {
     if (!importedImage) return;
-    const maxEdge = parseInt(importSizeSelect.value);
+    const maxEdge = clampImportSize(importSizeSelect.value);
+    importSizeSelect.value = String(maxEdge);
+    importSizeInput.value = String(maxEdge);
     const dims = getImportDims(maxEdge);
     importPreview.width = dims.w;
     importPreview.height = dims.h;
@@ -1385,8 +1395,7 @@
     const displayH = display.h;
     importPreview.style.width = displayW + 'px';
     importPreview.style.height = displayH + 'px';
-
-    document.getElementById('importSizeLabel').textContent = keepRatio ? 'Longest edge (' + dims.w + '×' + dims.h + ')' : 'Canvas size';
+    importSizeCount.textContent = keepRatio ? (dims.w + ' × ' + dims.h) : (maxEdge + ' × ' + maxEdge);
   }
 
   document.getElementById('importBtn').addEventListener('click', () => {
@@ -1400,9 +1409,9 @@
     function onImageReady(img) {
       importedImage = img;
       const longest = Math.max(gridW, gridH);
-      const opts = Array.from(importSizeSelect.options).map(o => parseInt(o.value));
-      const best = opts.reduce((a, b) => Math.abs(b - longest) < Math.abs(a - longest) ? b : a);
-      importSizeSelect.value = String(best);
+      const initialSize = clampImportSize(longest);
+      importSizeSelect.value = String(initialSize);
+      importSizeInput.value = String(initialSize);
       updateImportPreview();
       importOverlay.classList.add('visible');
     }
@@ -1450,7 +1459,22 @@
     updateImportPreview();
   });
 
-  importSizeSelect.addEventListener('change', updateImportPreview);
+  importSizeSelect.addEventListener('input', () => {
+    importSizeInput.value = importSizeSelect.value;
+    updateImportPreview();
+  });
+  importSizeInput.addEventListener('input', () => {
+    if (importSizeInput.value.trim() === '') return;
+    const value = clampImportSize(importSizeInput.value);
+    importSizeSelect.value = String(value);
+    updateImportPreview();
+  });
+  importSizeInput.addEventListener('change', () => {
+    const value = clampImportSize(importSizeInput.value);
+    importSizeInput.value = String(value);
+    importSizeSelect.value = String(value);
+    updateImportPreview();
+  });
 
   document.getElementById('importCancel').addEventListener('click', () => {
     importOverlay.classList.remove('visible');
@@ -1459,7 +1483,7 @@
 
   document.getElementById('importConfirm').addEventListener('click', () => {
     if (!importedImage) return;
-    const maxEdge = parseInt(importSizeSelect.value);
+    const maxEdge = clampImportSize(importSizeSelect.value);
     const dims = getImportDims(maxEdge);
 
     saveState();

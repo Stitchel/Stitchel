@@ -204,18 +204,12 @@
       <span>Keep original ratio</span>
       <button class="toggle" id="ratioToggle"></button>
     </div>
-    <div class="import-option">
-      <span id="importSizeLabel">Canvas size</span>
-      <select id="importSize" style="font-family:inherit;font-size:12px;font-weight:600;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);">
-        <option value="16">16 × 16</option>
-        <option value="24">24 × 24</option>
-        <option value="32" selected>32 × 32</option>
-        <option value="48">48 × 48</option>
-        <option value="64">64 × 64</option>
-        <option value="80">80 × 80</option>
-        <option value="100">100 × 100</option>
-        <option value="600">600 × 600</option>
-      </select>
+    <div class="import-option import-size-option">
+      <span class="import-size-label"><span id="importSizeLabel">Image size</span> <span class="import-size-count" id="importSizeCount">32 × 32</span></span>
+      <div class="import-size-control">
+        <input type="range" class="grid-slider import-size-slider" id="importSize" min="16" max="600" step="1" value="32" aria-label="Import canvas size">
+        <input type="number" id="importSizeValue" min="16" max="600" step="1" value="32" aria-label="Import canvas size value">
+      </div>
     </div>
     <div class="import-actions">
       <button class="btn" id="importCancel">Cancel</button>
@@ -225,6 +219,6 @@
 </div>
 
 <script src="js/palettes.js"></script>
-<script src="js/app.js?v=12"></script>
+<script src="js/app.js?v=14"></script>
 </body>
 </html>
