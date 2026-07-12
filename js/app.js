@@ -842,10 +842,12 @@
 
   // Mirror toggle
   const mirrorToggle = document.getElementById('mirrorToggle');
-  mirrorToggle.addEventListener('click', () => {
-    mirrorX = !mirrorX;
-    mirrorToggle.classList.toggle('on', mirrorX);
-  });
+  if (mirrorToggle) {
+    mirrorToggle.addEventListener('click', () => {
+      mirrorX = !mirrorX;
+      mirrorToggle.classList.toggle('on', mirrorX);
+    });
+  }
 
   // Stitch tracker
   function buildStitchTracker() {
