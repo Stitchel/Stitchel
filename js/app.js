@@ -94,49 +94,61 @@
     }
   }
 
-  function getCellSize() {
+  function getFitScale() {
     const area = canvasArea.getBoundingClientRect();
-    const maxW = (area.width - 40);
-    const maxH = (area.height - 80);
-    const base = Math.min(maxW / gridW, maxH / gridH);
-    return Math.max(2, Math.floor(base * zoom));
+    const maxW = Math.max(1, area.width - 40);
+    const maxH = Math.max(1, area.height - 80);
+    return Math.min(maxW / gridW, maxH / gridH);
+  }
+
+  function getCanvasScale() {
+    return Math.max(0.01, getFitScale() * zoom);
+  }
+
+  function updateZoomLabel() {
+    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
   }
 
   function resizeCanvas() {
-    const cellSize = getCellSize();
-    const w = gridW * cellSize;
-    const h = gridH * cellSize;
-    canvas.width = w;
-    canvas.height = h;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
+    const scale = getCanvasScale();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = (gridW * scale) + 'px';
+    canvas.style.height = (gridH * scale) + 'px';
+    canvas.width = Math.max(1, Math.round(gridW * scale * dpr));
+    canvas.height = Math.max(1, Math.round(gridH * scale * dpr));
     draw();
   }
 
   function draw() {
-    const cellSize = getCellSize();
+    const scale = getCanvasScale();
     const w = canvas.width;
     const h = canvas.height;
+    const scaleX = w / gridW;
+    const scaleY = h / gridH;
+    const cellScale = Math.min(scaleX, scaleY);
 
+    ctx.imageSmoothingEnabled = false;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, gridW, gridH);
 
     // Pixels
     for (let y = 0; y < gridH; y++) {
       for (let x = 0; x < gridW; x++) {
         if (pixels[y][x]) {
           ctx.fillStyle = pixels[y][x];
-          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          ctx.fillRect(x, y, 1, 1);
           if (doneColors.has(pixels[y][x])) {
             ctx.fillStyle = 'rgba(255,255,255,0.25)';
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-            if (cellSize >= 8) {
+            ctx.fillRect(x, y, 1, 1);
+            if (scale >= 8) {
               ctx.strokeStyle = 'rgba(0,0,0,0.2)';
               ctx.lineWidth = 1;
               ctx.beginPath();
-              ctx.moveTo(x * cellSize, y * cellSize);
-              ctx.lineTo((x+1) * cellSize, (y+1) * cellSize);
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + 1, y + 1);
               ctx.stroke();
             }
           }
@@ -150,7 +162,7 @@
       for (const [px, py] of previewPixels) {
         if (px >= 0 && px < gridW && py >= 0 && py < gridH) {
           ctx.fillStyle = currentTool === 'eraser' ? '#FF000044' : currentColor;
-          ctx.fillRect(px * cellSize, py * cellSize, cellSize, cellSize);
+          ctx.fillRect(px, py, 1, 1);
         }
       }
       ctx.globalAlpha = 1;
@@ -162,26 +174,38 @@
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = currentTool === 'eraser' ? '#E85D3A' : currentColor;
       for (const [px, py] of footprint) {
-        ctx.fillRect(px * cellSize, py * cellSize, cellSize, cellSize);
+        ctx.fillRect(px, py, 1, 1);
       }
       ctx.globalAlpha = 1;
     }
 
     // Grid
-    if (showGrid && cellSize >= 4) {
-      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= gridW; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * cellSize + 0.5, 0);
-        ctx.lineTo(x * cellSize + 0.5, h);
-        ctx.stroke();
+    if (showGrid) {
+      const strokeGrid = (step, color, widthFactor) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = widthFactor / Math.max(scaleX, scaleY);
+        for (let x = 0; x <= gridW; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5 / scaleX, 0);
+          ctx.lineTo(x + 0.5 / scaleX, gridH);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= gridH; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(0, y + 0.5 / scaleY);
+          ctx.lineTo(gridW, y + 0.5 / scaleY);
+          ctx.stroke();
+        }
+      };
+
+      if (cellScale >= 8) {
+        strokeGrid(1, 'rgba(0,0,0,0.08)', 1);
       }
-      for (let y = 0; y <= gridH; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * cellSize + 0.5);
-        ctx.lineTo(w, y * cellSize + 0.5);
-        ctx.stroke();
+      if (cellScale >= 1.5) {
+        strokeGrid(10, 'rgba(0,0,0,0.16)', 1.25);
+      }
+      if (gridW >= 100 || gridH >= 100) {
+        strokeGrid(100, 'rgba(0,0,0,0.28)', 1.75);
       }
     }
   }
@@ -238,9 +262,10 @@
 
   function getCell(e) {
     const rect = canvas.getBoundingClientRect();
-    const cellSize = getCellSize();
-    const x = Math.floor((e.clientX - rect.left) / cellSize);
-    const y = Math.floor((e.clientY - rect.top) / cellSize);
+    const cellSizeX = rect.width / gridW;
+    const cellSizeY = rect.height / gridH;
+    const x = Math.floor((e.clientX - rect.left) / cellSizeX);
+    const y = Math.floor((e.clientY - rect.top) / cellSizeY);
     return { x, y };
   }
 
@@ -449,7 +474,7 @@
     } else {
       zoom = Math.max(0.25, zoom / 1.15);
     }
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    updateZoomLabel();
     resizeCanvas();
   }, { passive: false });
 
@@ -801,7 +826,7 @@
     gridW = newSize;
     gridH = newSize;
     zoom = 1;
-    document.getElementById('zoomLabel').textContent = '100%';
+    updateZoomLabel();
     hoverCell = null;
     resizeCanvas();
     buildStitchTracker();
@@ -878,17 +903,17 @@
   // Zoom buttons
   document.getElementById('zoomIn').addEventListener('click', () => {
     zoom = Math.min(8, zoom * 1.25);
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    updateZoomLabel();
     resizeCanvas();
   });
   document.getElementById('zoomOut').addEventListener('click', () => {
     zoom = Math.max(0.25, zoom / 1.25);
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    updateZoomLabel();
     resizeCanvas();
   });
   document.getElementById('zoomFit').addEventListener('click', () => {
     zoom = 1;
-    document.getElementById('zoomLabel').textContent = '100%';
+    updateZoomLabel();
     resizeCanvas();
   });
 
@@ -1463,7 +1488,7 @@
     gridSlider.value = Math.max(dims.w, dims.h);
     gridSizeLabel.textContent = dims.w + ' × ' + dims.h;
     zoom = 1;
-    document.getElementById('zoomLabel').textContent = '100%';
+    updateZoomLabel();
     undoStack = [];
     redoStack = [];
 

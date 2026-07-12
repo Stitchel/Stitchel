@@ -228,6 +228,7 @@ body.pattern-mode .pattern-mode-action {
 #pixelCanvas {
   display: block;
   cursor: crosshair;
+  background: #fff;
   image-rendering: pixelated;
 }
 
