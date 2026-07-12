@@ -1289,6 +1289,9 @@
   const importPreviewCtx = importPreview.getContext('2d');
   const snapToggle = document.getElementById('snapToggle');
   const importSizeSelect = document.getElementById('importSize');
+  const IMPORT_PREVIEW_TARGET_EDGE = 240;
+  const IMPORT_PREVIEW_MAX_W = 360;
+  const IMPORT_PREVIEW_MAX_H = 280;
 
   function hexToRgb(hex) {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -1332,6 +1335,28 @@
     return { w, h };
   }
 
+  function fitToTargetEdge(w, h, targetEdge, maxW, maxH) {
+    const edge = Math.max(w, h);
+    const scale = Math.min(targetEdge / edge, maxW / w, maxH / h);
+    return {
+      w: Math.max(1, Math.round(w * scale)),
+      h: Math.max(1, Math.round(h * scale))
+    };
+  }
+
+  function drawImportedImage(ctx, img, dims) {
+    if (keepRatio) {
+      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, dims.w, dims.h);
+      return;
+    }
+
+    const aspect = img.width / img.height;
+    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+    if (aspect > 1) { sx = (img.width - img.height) / 2; sw = img.height; }
+    else if (aspect < 1) { sy = (img.height - img.width) / 2; sh = img.width; }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
+  }
+
   function updateImportPreview() {
     if (!importedImage) return;
     const maxEdge = parseInt(importSizeSelect.value);
@@ -1341,16 +1366,7 @@
     importPreviewCtx.imageSmoothingEnabled = true;
     importPreviewCtx.imageSmoothingQuality = 'medium';
 
-    const img = importedImage;
-    if (keepRatio) {
-      importPreviewCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, dims.w, dims.h);
-    } else {
-      const aspect = img.width / img.height;
-      let sx = 0, sy = 0, sw = img.width, sh = img.height;
-      if (aspect > 1) { sx = (img.width - img.height) / 2; sw = img.height; }
-      else if (aspect < 1) { sy = (img.height - img.width) / 2; sh = img.width; }
-      importPreviewCtx.drawImage(img, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
-    }
+    drawImportedImage(importPreviewCtx, importedImage, dims);
 
     if (snapToPalette) {
       const imgData = importPreviewCtx.getImageData(0, 0, dims.w, dims.h);
@@ -1362,9 +1378,9 @@
       importPreviewCtx.putImageData(imgData, 0, 0);
     }
 
-    const scale = Math.min(200 / dims.w, 200 / dims.h);
-    const displayW = Math.max(dims.w, Math.floor(dims.w * scale));
-    const displayH = Math.max(dims.h, Math.floor(dims.h * scale));
+    const display = fitToTargetEdge(dims.w, dims.h, IMPORT_PREVIEW_TARGET_EDGE, IMPORT_PREVIEW_MAX_W, IMPORT_PREVIEW_MAX_H);
+    const displayW = display.w;
+    const displayH = display.h;
     importPreview.style.width = displayW + 'px';
     importPreview.style.height = displayH + 'px';
 
@@ -1457,16 +1473,7 @@
     tmpCtx.imageSmoothingEnabled = true;
     tmpCtx.imageSmoothingQuality = 'medium';
 
-    const img = importedImage;
-    if (keepRatio) {
-      tmpCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, dims.w, dims.h);
-    } else {
-      const aspect = img.width / img.height;
-      let sx = 0, sy = 0, sw = img.width, sh = img.height;
-      if (aspect > 1) { sx = (img.width - img.height) / 2; sw = img.height; }
-      else if (aspect < 1) { sy = (img.height - img.width) / 2; sh = img.width; }
-      tmpCtx.drawImage(img, sx, sy, sw, sh, 0, 0, dims.w, dims.h);
-    }
+    drawImportedImage(tmpCtx, importedImage, dims);
 
     const imgData = tmpCtx.getImageData(0, 0, dims.w, dims.h);
     const d = imgData.data;

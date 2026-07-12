@@ -650,7 +650,7 @@ body.pattern-mode .pattern-mode-action {
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   padding: 24px;
-  width: 340px;
+  width: min(420px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -745,13 +745,13 @@ body.pattern-mode .pattern-mode-action {
   justify-content: center;
   background: var(--surface-alt);
   border-radius: var(--radius-sm);
-  padding: 12px;
-  min-height: 120px;
+  padding: 18px;
+  min-height: 240px;
 }
 
 .import-preview-wrap canvas {
   max-width: 100%;
-  max-height: 140px;
+  max-height: 280px;
   image-rendering: pixelated;
   border-radius: 2px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
