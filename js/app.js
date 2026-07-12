@@ -9,6 +9,8 @@
   } catch(e) {}
 
   let activePaletteKey = 'default';
+  let activePaletteRgbCache = null;
+  let activePaletteRgbCacheKey = null;
 
   function getActivePalette() {
     if (PALETTES[activePaletteKey]) return PALETTES[activePaletteKey];
@@ -17,8 +19,14 @@
     return PALETTES.default;
   }
 
+  function invalidatePaletteCache() {
+    activePaletteRgbCache = null;
+    activePaletteRgbCacheKey = null;
+  }
+
   function saveCustomPalettes() {
     try { localStorage.setItem('pixelStudio_customPalettes', JSON.stringify(customPalettes)); } catch(e) {}
+    invalidatePaletteCache();
   }
 
 
@@ -1285,6 +1293,7 @@
   let importedImage = null;
   let snapToPalette = true;
   let keepRatio = false;
+  let importPreviewRaf = null;
 
   const importOverlay = document.getElementById('importOverlay');
   const importPreview = document.getElementById('importPreview');
@@ -1314,20 +1323,23 @@
     return Math.min(600, Math.max(16, parsed));
   }
 
-  function colorDistance(a, b) {
-    return (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2;
+  function colorDistance(r1, g1, b1, r2, g2, b2) {
+    return (r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2;
   }
 
   function closestPalette(r, g, b) {
     const pal = getActivePalette();
-    const colors = pal.colors;
+    if (!activePaletteRgbCache || activePaletteRgbCacheKey !== activePaletteKey || activePaletteRgbCache.length !== pal.colors.length) {
+      activePaletteRgbCache = pal.colors.map(hex => ({ hex, rgb: hexToRgb(hex) }));
+      activePaletteRgbCacheKey = activePaletteKey;
+    }
     let best = 0, bestDist = Infinity;
-    for (let i = 0; i < colors.length; i++) {
-      const pr = hexToRgb(colors[i]);
-      const d = colorDistance([r, g, b], pr);
+    for (let i = 0; i < activePaletteRgbCache.length; i++) {
+      const prgb = activePaletteRgbCache[i].rgb;
+      const d = colorDistance(r, g, b, prgb[0], prgb[1], prgb[2]);
       if (d < bestDist) { bestDist = d; best = i; }
     }
-    return colors[best];
+    return activePaletteRgbCache[best].hex;
   }
 
   function getImportDims(maxEdge) {
@@ -1352,6 +1364,15 @@
       w: Math.max(1, Math.round(w * scale)),
       h: Math.max(1, Math.round(h * scale))
     };
+  }
+
+  function scheduleImportPreviewUpdate() {
+    if (!importedImage) return;
+    if (importPreviewRaf) return;
+    importPreviewRaf = requestAnimationFrame(() => {
+      importPreviewRaf = null;
+      updateImportPreview();
+    });
   }
 
   function drawImportedImage(ctx, img, dims) {
@@ -1390,11 +1411,9 @@
       importPreviewCtx.putImageData(imgData, 0, 0);
     }
 
-    const display = fitToTargetEdge(dims.w, dims.h, IMPORT_PREVIEW_TARGET_EDGE, IMPORT_PREVIEW_MAX_W, IMPORT_PREVIEW_MAX_H);
-    const displayW = display.w;
-    const displayH = display.h;
-    importPreview.style.width = displayW + 'px';
-    importPreview.style.height = displayH + 'px';
+    const previewDims = fitToTargetEdge(dims.w, dims.h, IMPORT_PREVIEW_TARGET_EDGE, IMPORT_PREVIEW_MAX_W, IMPORT_PREVIEW_MAX_H);
+    importPreview.style.width = previewDims.w + 'px';
+    importPreview.style.height = previewDims.h + 'px';
     importSizeCount.textContent = keepRatio ? (dims.w + ' × ' + dims.h) : (maxEdge + ' × ' + maxEdge);
   }
 
@@ -1412,7 +1431,7 @@
       const initialSize = clampImportSize(longest);
       importSizeSelect.value = String(initialSize);
       importSizeInput.value = String(initialSize);
-      updateImportPreview();
+      scheduleImportPreviewUpdate();
       importOverlay.classList.add('visible');
     }
 
@@ -1449,34 +1468,38 @@
   snapToggle.addEventListener('click', () => {
     snapToPalette = !snapToPalette;
     snapToggle.classList.toggle('on', snapToPalette);
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
 
   const ratioToggle = document.getElementById('ratioToggle');
   ratioToggle.addEventListener('click', () => {
     keepRatio = !keepRatio;
     ratioToggle.classList.toggle('on', keepRatio);
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
 
   importSizeSelect.addEventListener('input', () => {
     importSizeInput.value = importSizeSelect.value;
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
   importSizeInput.addEventListener('input', () => {
     if (importSizeInput.value.trim() === '') return;
     const value = clampImportSize(importSizeInput.value);
     importSizeSelect.value = String(value);
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
   importSizeInput.addEventListener('change', () => {
     const value = clampImportSize(importSizeInput.value);
     importSizeInput.value = String(value);
     importSizeSelect.value = String(value);
-    updateImportPreview();
+    scheduleImportPreviewUpdate();
   });
 
   document.getElementById('importCancel').addEventListener('click', () => {
+    if (importPreviewRaf) {
+      cancelAnimationFrame(importPreviewRaf);
+      importPreviewRaf = null;
+    }
     importOverlay.classList.remove('visible');
     importedImage = null;
   });
