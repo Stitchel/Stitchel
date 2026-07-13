@@ -1067,13 +1067,17 @@ td{width:${cellPx}px;min-width:${cellPx}px;max-width:${cellPx}px;height:${cellPx
 .print-sections{display:none}
 .section{margin-bottom:16px}
 .section-title{font-size:10px;font-weight:700;color:#888;margin-bottom:4px}
+.print-svg{display:block;max-width:100%;height:auto}
 .print-legend{display:none}
 @media print{
+html,body{height:auto!important;overflow:visible!important}
 .view-bar,.view-layout{display:none!important}
 .print-sections{display:block!important}
 .print-legend{display:block!important;page-break-before:always;padding:16px}
-.section{page-break-inside:avoid}
+.section{break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always}
+.section:last-of-type{break-after:auto;page-break-after:auto}
 body{padding:10px}
+table{break-inside:avoid;page-break-inside:avoid}
 td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
 }
 </style></head><body>
@@ -1127,6 +1131,24 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
   function luminance(hex) {
     var rgb = hexToRgb(hex);
     return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+  }
+
+  function expandHex(hex) {
+    var value = String(hex || '').trim();
+    if (value.charAt(0) !== '#') return value;
+    if (value.length === 4) {
+      return '#' + value[1] + value[1] + value[2] + value[2] + value[3] + value[3];
+    }
+    return value;
+  }
+
+  function svgText(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   function guideLineStyle(x, y) {
@@ -1298,6 +1320,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
     var usedColors = data.usedColors;
     var sorted = data.sorted;
     var cellPx = data.cellPx;
+    var axisPx = data.axisPx;
     var colsPerPage = Math.min(gridW, Math.floor(680 / cellPx));
     var rowsPerPage = Math.min(gridH, Math.floor(900 / cellPx));
     var html = '';
@@ -1311,29 +1334,44 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
         pageNum++;
         var endX = Math.min(startX + colsPerPage, gridW);
         var endY = Math.min(startY + rowsPerPage, gridH);
-        html += '<div class="section">';
+        var sectionCols = endX - startX;
+        var sectionRows = endY - startY;
+        var svgW = axisPx + sectionCols * cellPx;
+        var svgH = axisPx + sectionRows * cellPx;
+        var sectionBreak = pageNum === 1 ? '' : 'break-before:page;page-break-before:always;';
+        html += '<div class="section" style="display:block;break-inside:avoid;page-break-inside:avoid;' + sectionBreak + '">';
         html += '<div class="section-title">Section ' + pageNum + ': Col ' + (startX + 1) + '–' + endX + ', Row ' + (startY + 1) + '–' + endY + '</div>';
-        html += '<div class="grid-table-wrap"><div class="grid-guides"></div><table><tr><td class="ax"></td>';
+        html += '<svg class="print-svg" xmlns="http://www.w3.org/2000/svg" width="' + svgW + '" height="' + svgH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '" shape-rendering="crispEdges">';
+        html += '<rect x="0" y="0" width="' + svgW + '" height="' + svgH + '" fill="#ffffff"/>';
+        html += '<rect x="0" y="0" width="' + axisPx + '" height="' + axisPx + '" fill="#f0f0f0" stroke="#ccc" stroke-width="1"/>';
         for (var x = startX; x < endX; x++) {
-          html += '<td class="ax" style="' + guideLineStyle(x, startY) + '">' + (x + 1) + '</td>';
+          var ox = axisPx + (x - startX) * cellPx;
+          var topStrokeWidth = ((x + 1) % 10 === 0) ? 1.5 : 1;
+          html += '<rect x="' + ox + '" y="0" width="' + cellPx + '" height="' + axisPx + '" fill="#f0f0f0" stroke="#ccc" stroke-width="' + topStrokeWidth + '"/>';
+          html += '<text x="' + (ox + cellPx / 2) + '" y="' + (axisPx / 2 + 2) + '" text-anchor="middle" font-family="SF Mono,Consolas,monospace" font-size="8" font-weight="600" fill="#888">' + svgText(x + 1) + '</text>';
         }
-        html += '</tr>';
         for (var y = startY; y < endY; y++) {
-          html += '<tr><td class="ax" style="' + guideLineStyle(startX, y) + '">' + (y + 1) + '</td>';
+          var oy = axisPx + (y - startY) * cellPx;
+          var leftStrokeWidth = ((y + 1) % 10 === 0) ? 1.5 : 1;
+          html += '<rect x="0" y="' + oy + '" width="' + axisPx + '" height="' + cellPx + '" fill="#f0f0f0" stroke="#ccc" stroke-width="' + leftStrokeWidth + '"/>';
+          html += '<text x="' + (axisPx / 2) + '" y="' + (oy + cellPx / 2 + 2) + '" text-anchor="middle" font-family="SF Mono,Consolas,monospace" font-size="8" font-weight="600" fill="#888">' + svgText(y + 1) + '</text>';
           for (var x2 = startX; x2 < endX; x2++) {
             var c = pixels[y][x2];
-            var bd = guideLineStyle(x2, y);
+            var ox2 = axisPx + (x2 - startX) * cellPx;
+            var strokeWidth = (((x2 + 1) % 10 === 0) || ((y + 1) % 10 === 0)) ? 1.5 : 1;
             if (c) {
               var dm = usedColors[c] || '';
               var tc = luminance(c) > 140 ? '#000' : '#fff';
-              html += '<td style="background:' + c + ';color:' + tc + ';' + bd + '">' + dm + '</td>';
+              html += '<rect x="' + ox2 + '" y="' + oy + '" width="' + cellPx + '" height="' + cellPx + '" fill="' + expandHex(c) + '" stroke="#bbb" stroke-width="' + strokeWidth + '"/>';
+              if (cellPx >= 12) {
+                html += '<text x="' + (ox2 + cellPx / 2) + '" y="' + (oy + cellPx / 2 + 2) + '" text-anchor="middle" font-family="SF Mono,Consolas,monospace" font-size="8" font-weight="700" fill="' + tc + '">' + svgText(dm) + '</text>';
+              }
             } else {
-              html += '<td style="' + bd + '"></td>';
+              html += '<rect x="' + ox2 + '" y="' + oy + '" width="' + cellPx + '" height="' + cellPx + '" fill="#ffffff" stroke="#bbb" stroke-width="' + strokeWidth + '"/>';
             }
           }
-          html += '</tr>';
         }
-        html += '</table></div></div>';
+        html += '</svg></div>';
       }
     }
 
@@ -1342,7 +1380,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
     for (var i = 0; i < sorted.length; i++) {
       var hex = sorted[i][0];
       var dmc = sorted[i][1];
-      html += '<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600"><div class="leg-swatch" style="background:' + hex + '"></div>' + dmc + '</div>';
+      html += '<div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600"><svg class="leg-swatch" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" shape-rendering="crispEdges"><rect x="0" y="0" width="22" height="22" fill="' + expandHex(hex) + '" stroke="#D4CDB8" stroke-width="1"/></svg>' + dmc + '</div>';
     }
     html += '</div></div>';
 
@@ -1351,9 +1389,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
 
   function printPattern() {
     buildPrintSections();
-    requestAnimationFrame(function() {
-      window.print();
-    });
+    window.print();
   }
 
   function initPatternView() {
