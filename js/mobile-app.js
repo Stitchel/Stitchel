@@ -557,9 +557,12 @@ body{margin:0;font-family:"SF Mono","Consolas",monospace;color:#2C2416;backgroun
 .view-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #D4CDB8;background:#FFFDF7}
 .view-bar h2{font-size:14px;margin:0}
 .view-bar .info{font-size:10px;color:#666;margin:0}
+.legend-toggle{padding:6px 10px;border:1px solid #D4CDB8;border-radius:999px;background:#FFFDF7;color:#2C2416;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.legend-toggle:hover{background:#F5F0E8}
 .view-layout{display:flex;height:calc(100vh - 52px)}
 .legend-panel{width:200px;border-left:1px solid #D4CDB8;display:flex;flex-direction:column;overflow:hidden;padding:16px 12px;flex-shrink:0;background:#FFFDF7;min-height:0}
-.legend-panel h2{font-size:14px;margin:0 0 14px;color:#2C2416;flex-shrink:0}
+.legend-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.legend-panel h2{font-size:14px;margin:0;color:#2C2416;flex-shrink:0}
 .legend-panel h3{font-size:11px;margin:0 0 12px;color:#8A7E6B;text-transform:uppercase;letter-spacing:1px;flex-shrink:0;padding-bottom:10px;border-bottom:1px solid rgba(212,205,184,0.75)}
 #legendItems{overflow-y:auto;min-height:0;flex:1;padding-top:10px}
 .leg-item{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;padding:6px;border-radius:6px;transition:background 0.15s;user-select:none;color:#2C2416}
@@ -595,6 +598,32 @@ td{width:${data.cellPx}px;min-width:${data.cellPx}px;max-width:${data.cellPx}px;
 .section{margin-bottom:16px}
 .section-title{font-size:10px;font-weight:700;color:#888;margin-bottom:4px}
 .print-legend{display:none}
+@media (max-width: 820px){
+.view-layout{flex-direction:column;height:calc(100vh - 52px)}
+.grid-shell{order:1;flex:1 1 auto;min-height:0;background:#fff}
+.legend-panel{order:2;align-self:stretch;width:100%;max-height:24vh;border-left:0;border-top:1px solid #D4CDB8;padding:12px 12px 12px;border-radius:0;overflow:hidden;background-clip:padding-box;box-shadow:0 -6px 18px rgba(44,36,22,0.08);transition:max-height 0.18s ease, padding 0.18s ease, opacity 0.18s ease, transform 0.18s ease}
+.legend-panel-head{margin-bottom:10px}
+.legend-panel h2{font-size:11px;margin:0}
+.legend-panel h3{font-size:8px;margin:0 0 6px;padding-bottom:5px}
+#legendItems{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;padding-top:6px}
+.leg-item{min-width:0;gap:6px;padding:4px 6px;font-size:9px}
+.leg-check{width:12px;height:12px}
+.leg-swatch{width:14px;height:14px}
+.leg-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid-canvas{top:0;left:0;right:0;bottom:0}
+.grid-corner{display:block;width:${data.axisPx}px;height:${data.axisPx}px;background:rgba(240,240,240,0.95)}
+.grid-top-axis{left:0;right:0;height:${data.axisPx}px;background:rgba(240,240,240,0.95)}
+.grid-left-axis{display:block;width:${data.axisPx}px;top:0;bottom:0;background:rgba(240,240,240,0.95)}
+.grid-viewport{inset:0;background:#fff;scrollbar-gutter:auto}
+.legend-panel.collapsed{max-height:78px;padding-top:12px;padding-bottom:12px}
+.legend-panel.collapsed h3,
+.legend-panel.collapsed #legendItems{display:none}
+.legend-panel.collapsed .legend-panel-head{margin-bottom:0}
+.legend-panel.collapsed .legend-toggle::before{content:'▸ ';font-weight:700}
+@media (max-width: 480px){
+#legendItems{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+}
+}
 @media print{
 .view-bar,.view-layout{display:none!important}
 .print-sections{display:block!important}
@@ -617,7 +646,10 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
     <div class="grid-top-axis"><div class="grid-top-axis-inner" id="gridTopAxis"><div class="axis-guides-x"></div><table><tr>${topAxisCells}</tr></table></div></div>
     <div class="grid-left-axis"><div class="grid-left-axis-inner" id="gridLeftAxis"><div class="axis-guides-y"></div><table>${leftAxisRows}</table></div></div>  </div>
   <div class="legend-panel" id="legendPanel">
-    <h2>Progress Tracker</h2>
+    <div class="legend-panel-head">
+      <h2>Progress Tracker</h2>
+      <button class="legend-toggle" id="legendToggleBtn" type="button">Close tracker</button>
+    </div>
     <h3>Colors <span id="doneCount">0</span>/${data.sorted.length}</h3>
     <div id="legendItems"></div>
   </div>
@@ -634,6 +666,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
   var legendPanel = null;
   var legendItems = null;
   var doneCount = null;
+  var legendToggleBtn = null;
   var printSections = null;
   var ctx = null;
   var activeColor = null;
@@ -641,6 +674,8 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
   var drawRaf = 0;
   var printBuilt = false;
   var resizeObserver = null;
+  var legendCollapsed = false;
+  var isCompactLayout = window.matchMedia && window.matchMedia('(max-width: 820px)').matches;
 
   function hexToRgb(hex) {
     var value = hex.replace('#', '');
@@ -668,8 +703,8 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
     if (!patternCanvas || !gridViewport) return;
     var dpr = window.devicePixelRatio || 1;
     var maxCanvasPx = 8192;
-    var width = Math.max(1, gridViewport.clientWidth - data.axisPx);
-    var height = Math.max(1, gridViewport.clientHeight - data.axisPx);
+    var width = Math.max(1, gridViewport.clientWidth - (isCompactLayout ? 0 : data.axisPx));
+    var height = Math.max(1, gridViewport.clientHeight - (isCompactLayout ? 0 : data.axisPx));
     width = Math.min(width, Math.floor(maxCanvasPx / dpr));
     height = Math.min(height, Math.floor(maxCanvasPx / dpr));
     patternCanvas.width = Math.max(1, Math.round(width * dpr));
@@ -766,6 +801,21 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
 
   function updateDoneCount() {
     if (doneCount) doneCount.textContent = String(doneColors.size);
+  }
+
+  function updateLegendToggleLabel() {
+    if (!legendToggleBtn) return;
+    legendToggleBtn.textContent = legendCollapsed ? 'Open tracker' : 'Close tracker';
+    legendToggleBtn.setAttribute('aria-expanded', legendCollapsed ? 'false' : 'true');
+  }
+
+  function applyLegendCollapsedState() {
+    if (legendPanel) legendPanel.classList.toggle('collapsed', legendCollapsed);
+    updateLegendToggleLabel();
+    if (gridViewport) {
+      setCanvasSize();
+      scheduleDraw();
+    }
   }
 
   function setActive(hex) {
@@ -895,6 +945,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
     legendPanel = document.getElementById('legendPanel');
     legendItems = document.getElementById('legendItems');
     doneCount = document.getElementById('doneCount');
+    legendToggleBtn = document.getElementById('legendToggleBtn');
     printSections = document.getElementById('printSections');
     ctx = patternCanvas.getContext('2d');
 
@@ -920,6 +971,13 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
       resizeObserver.observe(gridViewport);
     }
 
+    if (legendToggleBtn) {
+      legendToggleBtn.addEventListener('click', function() {
+        legendCollapsed = !legendCollapsed;
+        applyLegendCollapsedState();
+      });
+    }
+
     function syncGridAxes() {
       if (gridTopAxis) gridTopAxis.style.transform = 'translateX(' + (-gridViewport.scrollLeft) + 'px)';
       if (gridLeftAxis) gridLeftAxis.style.transform = 'translateY(' + (-gridViewport.scrollTop) + 'px)';
@@ -930,6 +988,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
       scheduleDraw();
     }, { passive: true });
     syncGridAxes();
+    applyLegendCollapsedState();
 
     window.addEventListener('beforeprint', buildPrintSections);
   }

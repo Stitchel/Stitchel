@@ -298,7 +298,7 @@ body {
 
 .palette-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-top: 12px;
 }
@@ -349,12 +349,11 @@ body {
 .stitch-tracker {
   max-height: 32dvh;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding-right: 2px;
 }
-
 .tracker-empty,
 .custom-empty-msg {
   font-size: 13px;
@@ -692,8 +691,8 @@ body {
 }
 
 .custom-palette-swatches {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px 8px;
   min-height: 52px;
   padding: 12px 0 0;
@@ -801,8 +800,26 @@ body {
 }
 
 @media (max-width: 390px) {
+  .stitch-tracker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stitch-row {
+    padding: 8px 8px;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .stitch-progress {
+    font-size: 11px;
+  }
+
   .palette-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .custom-palette-swatches {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .app-main {
