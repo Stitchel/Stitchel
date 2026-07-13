@@ -440,6 +440,13 @@ body {
   gap: 10px;
 }
 
+.action-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .editor-note {
   text-align: center;
   color: var(--text-muted);
@@ -448,6 +455,20 @@ body {
   letter-spacing: 0.01em;
   pointer-events: none;
   text-shadow: 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.mobile-feedback-link {
+  flex-shrink: 0;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.mobile-feedback-link:hover {
+  color: var(--accent-hover);
 }
 
 .btn {

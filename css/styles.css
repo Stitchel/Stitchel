@@ -103,6 +103,27 @@ header {
   overflow: hidden;
 }
 
+.feedback-link {
+  align-self: flex-end;
+  margin-top: auto;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+}
+
+.feedback-link:hover {
+  color: var(--accent-hover);
+}
+
+body.pattern-mode .feedback-link {
+  display: none;
+}
+
 .pattern-frame {
   flex: 1;
   min-width: 0;
