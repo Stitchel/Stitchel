@@ -4,9 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stitchel</title>
+<script>
+(function() {
+  var ua = navigator.userAgent || '';
+  var isPhoneUa = /Mobi|iPhone|iPod|Android.*Mobile|Windows Phone/i.test(ua);
+  var isNarrowPhone = window.innerWidth <= 768 && window.innerHeight <= 1024;
+  if (isPhoneUa || (window.matchMedia('(pointer: coarse)').matches && isNarrowPhone && navigator.maxTouchPoints > 1 && !/iPad|Tablet/i.test(ua))) {
+    location.replace('mobile.html' + location.search + location.hash);
+  }
+})();
+</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="shortcut icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/styles.css?v=11">
+<link rel="stylesheet" href="css/styles.css?v=12">
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "4c5838511daa4ce89d2e8e75bbe4fe32"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
 <body>
@@ -209,6 +219,6 @@
 </div>
 
 <script src="js/palettes.js"></script>
-<script src="js/app.js?v=14"></script>
+<script src="js/app.js?v=15"></script>
 </body>
 </html>
