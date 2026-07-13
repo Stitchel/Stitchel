@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>Stitchel</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="shortcut icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/mobile.css?v=1">
+<!-- Cloudflare Web Analytics --><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "4c5838511daa4ce89d2e8e75bbe4fe32"}'></script><!-- End Cloudflare Web Analytics -->
+</head>
+<body class="mobile-app">
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div>
+          <div class="brand-name">Stitchel</div>
+          <div class="brand-subtitle">Photo → cross-stitch pattern</div>
+        </div>
+      </div>
+      <div class="status-chip" id="statusChip">No artwork yet</div>
+    </header>
+
+    <main class="app-main">
+      <section class="preview-card" id="previewCard" aria-label="Pattern preview">
+        <div class="empty-state" id="emptyState">
+          <strong>Add a photo to start.</strong>
+          <span>Snap or upload an image and Stitchel turns it into a cross-stitch pattern you can preview, recolor, and export.</span>
+        </div>
+        <canvas id="previewCanvas"></canvas>
+      </section>
+
+      <section class="bottom-sheet" aria-label="Palette and stitch tracker">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Palette</div>
+            <div class="palette-actions">
+              <button class="palette-action-btn" id="editPaletteBtn" title="Edit palette" style="display:none">✎</button>
+              <button class="palette-action-btn" id="addPaletteBtn" title="New palette">+</button>
+              <button class="palette-action-btn danger" id="delPaletteBtn" title="Delete palette" style="display:none">×</button>
+            </div>
+          </div>
+          <select class="palette-select" id="paletteSelect">
+            <option value="default">Pixel Art (36)</option>
+            <option value="dmc">DMC Thread (48)</option>
+          </select>
+          <div class="palette-grid" id="paletteGrid"></div>
+        </div>
+
+        <div class="panel stitch-panel" id="stitchPanel">
+          <div class="panel-head">
+            <div class="panel-title">Stitch Tracker</div>
+            <div class="stitch-progress" id="stitchProgress">0/0</div>
+          </div>
+          <div class="stitch-tracker" id="stitchTracker"></div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="action-bar" aria-label="Primary actions">
+      <div class="action-buttons">
+        <button class="btn btn-accent" id="exportPatternBtn" disabled>Pattern</button>
+        <button class="btn btn-accent" id="exportBtn" disabled>PNG</button>
+      </div>
+      <div class="editor-note">The full editor works best on a computer</div>
+    </nav>
+  </div>
+
+  <input type="file" id="importFile" accept="image/*,.heic,.heif">
+
+  <div class="sheet-overlay" id="paletteOverlay" aria-hidden="true">
+    <div class="sheet">
+      <h3 id="paletteModalTitle">Own palette</h3>
+      <div class="custom-palette-editor">
+        <input type="text" class="custom-palette-name" id="customPaletteName" placeholder="Own palette" maxlength="30">
+        <div class="import-option">
+          <span>Add by</span>
+          <select id="colorMode" class="sheet-select">
+            <option value="dmc">DMC Number</option>
+            <option value="hex">Hex Color</option>
+          </select>
+        </div>
+        <div class="custom-color-row" id="dmcInputRow">
+          <input type="text" class="custom-color-hex" id="dmcNumberInput" placeholder="DMC Number" maxlength="10">
+          <div id="dmcPreviewSwatch" class="dmc-preview"></div>
+          <button class="btn" id="addDmcBtn">Add</button>
+        </div>
+        <div class="custom-color-row" id="hexInputRow" style="display:none">
+          <input type="color" class="custom-color-input" id="customColorPicker" value="#E85D3A">
+          <input type="text" class="custom-color-hex" id="customColorHex" value="#E85D3A" maxlength="7">
+          <button class="btn" id="addColorBtn">Add</button>
+        </div>
+        <div class="custom-palette-swatches" id="customSwatches">
+          <span class="custom-empty-msg">Add DMC numbers or hex colors to build your palette</span>
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" id="paletteCancel">Cancel</button>
+        <button class="btn btn-accent" id="paletteSave">Save Palette</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" id="importOverlay" aria-hidden="true">
+    <div class="sheet">
+      <h3>Import Image</h3>
+      <div class="import-preview-wrap">
+        <canvas id="importPreview"></canvas>
+      </div>
+      <div class="import-option">
+        <span>Snap to palette</span>
+        <button class="toggle on" id="snapToggle"></button>
+      </div>
+      <div class="import-option">
+        <span>Keep original ratio</span>
+        <button class="toggle" id="ratioToggle"></button>
+      </div>
+      <div class="import-option import-size-option">
+        <span class="import-size-label"><span id="importSizeLabel">Image size</span> <span class="import-size-count" id="importSizeCount">32 × 32</span></span>
+        <div class="import-size-control">
+          <input type="range" class="grid-slider import-size-slider" id="importSize" min="16" max="600" step="1" value="32" aria-label="Import canvas size">
+          <input type="number" id="importSizeValue" min="16" max="600" step="1" value="32" aria-label="Import canvas size value">
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" id="importCancel">Cancel</button>
+        <button class="btn btn-accent" id="importConfirm">Pixelate</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pattern-overlay" id="patternOverlay" aria-hidden="true">
+    <div class="pattern-shell">
+      <div class="pattern-topbar">
+        <button class="btn" id="exitPatternBtn">Back</button>
+        <div class="pattern-title">
+          <span>Cross-Stitch Pattern</span>
+          <small id="patternMeta">0 × 0 stitches</small>
+        </div>
+        <button class="btn btn-accent" id="savePatternBtn">Save PDF</button>
+      </div>
+      <iframe class="pattern-frame" id="patternFrame" title="Cross-Stitch Pattern"></iframe>
+    </div>
+  </div>
+
+  <script src="js/palettes.js"></script>
+  <script src="js/mobile-app.js?v=1"></script>
+</body>
+</html>
