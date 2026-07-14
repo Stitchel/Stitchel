@@ -85,12 +85,28 @@
   let hoverCell = null;
   let spaceHeld = false;
   let doneColors = new Set();
+  const MAX_CANVAS_DIM = 16384;
 
   const canvas = document.getElementById('pixelCanvas');
   const ctx = canvas.getContext('2d');
   const canvasArea = document.getElementById('canvasArea');
   const canvasWrapper = document.getElementById('canvasWrapper');
   const coordsBar = document.getElementById('coordsBar');
+
+  // Offscreen buffer holding the static pixel layer. Rebuilt only when pixels
+  // change, so per-frame draws blit one image instead of iterating every cell.
+  const pixelLayer = document.createElement('canvas');
+  const pixelCtx = pixelLayer.getContext('2d');
+  let pixelsDirty = true;
+
+  let drawRaf = 0;
+  function scheduleDraw() {
+    if (drawRaf) return;
+    drawRaf = requestAnimationFrame(() => {
+      drawRaf = 0;
+      draw();
+    });
+  }
 
   function initPixels() {
     pixels = [];
@@ -100,6 +116,7 @@
         pixels[y][x] = null;
       }
     }
+    pixelsDirty = true;
   }
 
   function getFitScale() {
@@ -113,18 +130,124 @@
     return Math.max(0.01, getFitScale() * zoom);
   }
 
+  function getMaxVisibleZoom() {
+    const targetCellSize = 32;
+    return Math.max(8, targetCellSize / getFitScale());
+  }
+
+  function getRenderScale() {
+    const visibleScale = getCanvasScale();
+    const dpr = window.devicePixelRatio || 1;
+    const maxByWidth = MAX_CANVAS_DIM / (gridW * dpr);
+    const maxByHeight = MAX_CANVAS_DIM / (gridH * dpr);
+    return Math.max(0.01, Math.min(visibleScale, maxByWidth, maxByHeight));
+  }
+
+  function clampPan() {
+    const area = canvasArea.getBoundingClientRect();
+    const canvasWidth = gridW * getCanvasScale();
+    const canvasHeight = gridH * getCanvasScale();
+    const maxPanX = Math.max(0, (canvasWidth - area.width) / 2);
+    const maxPanY = Math.max(0, (canvasHeight - area.height) / 2);
+    panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+    panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+  }
+
   function updateZoomLabel() {
     document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
   }
 
   function resizeCanvas() {
-    const scale = getCanvasScale();
+    zoom = Math.min(zoom, getMaxVisibleZoom());
+    clampPan();
+    const displayScale = getCanvasScale();
+    const renderScale = getRenderScale();
     const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = (gridW * scale) + 'px';
-    canvas.style.height = (gridH * scale) + 'px';
-    canvas.width = Math.max(1, Math.round(gridW * scale * dpr));
-    canvas.height = Math.max(1, Math.round(gridH * scale * dpr));
+    canvas.style.width = (gridW * displayScale) + 'px';
+    canvas.style.height = (gridH * displayScale) + 'px';
+    canvas.width = Math.max(1, Math.round(gridW * renderScale * dpr));
+    canvas.height = Math.max(1, Math.round(gridH * renderScale * dpr));
+    pixelsDirty = true;
     draw();
+    applyPan();
+  }
+
+  function applyPan() {
+    canvasWrapper.style.transform = 'translate(-50%, -50%) translate(' + panX + 'px, ' + panY + 'px)';
+  }
+
+  function handleCanvasMove(e) {
+    const cell = getCell(e);
+    coordsBar.textContent = `${Math.max(0, Math.min(cell.x, gridW-1))}, ${Math.max(0, Math.min(cell.y, gridH-1))}`;
+    hoverCell = cell.x >= 0 && cell.x < gridW && cell.y >= 0 && cell.y < gridH ? cell : null;
+
+    if (isPanning && panStart) {
+      panX = panStart.px + (e.clientX - panStart.x);
+      panY = panStart.py + (e.clientY - panStart.y);
+      applyPan();
+      return;
+    }
+
+    if (!isDrawing) {
+      scheduleDraw();
+      return;
+    }
+
+    if (currentTool === 'pencil' || currentTool === 'eraser') {
+      const color = currentTool === 'eraser' ? null : currentColor;
+      if (lastCell) {
+        const pts = interpolate(lastCell.x, lastCell.y, cell.x, cell.y);
+        for (const [px, py] of pts) {
+          applyBrush(px, py, color);
+        }
+      } else {
+        applyBrush(cell.x, cell.y, color);
+      }
+      lastCell = cell;
+      scheduleDraw();
+    } else if ((currentTool === 'line' || currentTool === 'rect') && shapeStart) {
+      if (currentTool === 'line') {
+        previewPixels = plotLine(shapeStart.x, shapeStart.y, cell.x, cell.y);
+      } else {
+        previewPixels = plotRect(shapeStart.x, shapeStart.y, cell.x, cell.y);
+      }
+      scheduleDraw();
+    }
+  }
+
+  function renderPixelLayer(w, h, scaleX, scaleY, scale) {
+    if (pixelLayer.width !== w || pixelLayer.height !== h) {
+      pixelLayer.width = w;
+      pixelLayer.height = h;
+    }
+    pixelCtx.imageSmoothingEnabled = false;
+    pixelCtx.setTransform(1, 0, 0, 1, 0, 0);
+    pixelCtx.clearRect(0, 0, w, h);
+    pixelCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+    pixelCtx.fillStyle = '#FFFFFF';
+    pixelCtx.fillRect(0, 0, gridW, gridH);
+
+    for (let y = 0; y < gridH; y++) {
+      for (let x = 0; x < gridW; x++) {
+        if (pixels[y][x]) {
+          pixelCtx.fillStyle = pixels[y][x];
+          pixelCtx.fillRect(x, y, 1, 1);
+          if (doneColors.has(pixels[y][x])) {
+            pixelCtx.fillStyle = 'rgba(255,255,255,0.25)';
+            pixelCtx.fillRect(x, y, 1, 1);
+            if (scale >= 8) {
+              pixelCtx.strokeStyle = 'rgba(0,0,0,0.2)';
+              pixelCtx.lineWidth = 1;
+              pixelCtx.beginPath();
+              pixelCtx.moveTo(x, y);
+              pixelCtx.lineTo(x + 1, y + 1);
+              pixelCtx.stroke();
+            }
+          }
+        }
+      }
+    }
+    pixelsDirty = false;
   }
 
   function draw() {
@@ -135,34 +258,16 @@
     const scaleY = h / gridH;
     const cellScale = Math.min(scaleX, scaleY);
 
+    // The static pixel layer is cached; only rebuild it when pixels change.
+    if (pixelsDirty || pixelLayer.width !== w || pixelLayer.height !== h) {
+      renderPixelLayer(w, h, scaleX, scaleY, scale);
+    }
+
     ctx.imageSmoothingEnabled = false;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(pixelLayer, 0, 0);
     ctx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, gridW, gridH);
-
-    // Pixels
-    for (let y = 0; y < gridH; y++) {
-      for (let x = 0; x < gridW; x++) {
-        if (pixels[y][x]) {
-          ctx.fillStyle = pixels[y][x];
-          ctx.fillRect(x, y, 1, 1);
-          if (doneColors.has(pixels[y][x])) {
-            ctx.fillStyle = 'rgba(255,255,255,0.25)';
-            ctx.fillRect(x, y, 1, 1);
-            if (scale >= 8) {
-              ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(x, y);
-              ctx.lineTo(x + 1, y + 1);
-              ctx.stroke();
-            }
-          }
-        }
-      }
-    }
 
     // Preview (for shapes)
     if (previewPixels) {
@@ -282,6 +387,7 @@
       const mx = gridW - 1 - x;
       if (mx >= 0 && mx < gridW) pixels[y][mx] = color;
     }
+    pixelsDirty = true;
   }
 
   function applyBrush(cx, cy, color) {
@@ -362,6 +468,7 @@
       }
       stack.push([x-1,y],[x+1,y],[x,y-1],[x,y+1]);
     }
+    pixelsDirty = true;
   }
 
   function interpolate(x0, y0, x1, y1) {
@@ -384,15 +491,15 @@
     if (currentTool === 'pencil') {
       saveState();
       applyBrush(cell.x, cell.y, currentColor);
-      draw();
+      scheduleDraw();
     } else if (currentTool === 'eraser') {
       saveState();
       applyBrush(cell.x, cell.y, null);
-      draw();
+      scheduleDraw();
     } else if (currentTool === 'fill') {
       saveState();
       floodFill(cell.x, cell.y, currentColor);
-      draw();
+      scheduleDraw();
       isDrawing = false;
     } else if (currentTool === 'eyedropper') {
       if (cell.x >= 0 && cell.x < gridW && cell.y >= 0 && cell.y < gridH && pixels[cell.y][cell.x]) {
@@ -405,40 +512,9 @@
     }
   });
 
-  canvas.addEventListener('mousemove', (e) => {
-    const cell = getCell(e);
-    coordsBar.textContent = `${Math.max(0, Math.min(cell.x, gridW-1))}, ${Math.max(0, Math.min(cell.y, gridH-1))}`;
-    hoverCell = cell.x >= 0 && cell.x < gridW && cell.y >= 0 && cell.y < gridH ? cell : null;
-
-    if (isPanning && panStart) {
-      return;
-    }
-
-    if (!isDrawing) {
-      draw();
-      return;
-    }
-
-    if (currentTool === 'pencil' || currentTool === 'eraser') {
-      const color = currentTool === 'eraser' ? null : currentColor;
-      if (lastCell) {
-        const pts = interpolate(lastCell.x, lastCell.y, cell.x, cell.y);
-        for (const [px, py] of pts) {
-          applyBrush(px, py, color);
-        }
-      } else {
-        applyBrush(cell.x, cell.y, color);
-      }
-      lastCell = cell;
-      draw();
-    } else if ((currentTool === 'line' || currentTool === 'rect') && shapeStart) {
-      if (currentTool === 'line') {
-        previewPixels = plotLine(shapeStart.x, shapeStart.y, cell.x, cell.y);
-      } else {
-        previewPixels = plotRect(shapeStart.x, shapeStart.y, cell.x, cell.y);
-      }
-      draw();
-    }
+  canvas.addEventListener('mousemove', handleCanvasMove);
+  document.addEventListener('mousemove', (e) => {
+    if (isPanning && panStart) handleCanvasMove(e);
   });
 
   function endDraw(e) {
@@ -458,7 +534,7 @@
       }
       previewPixels = null;
       shapeStart = null;
-      draw();
+      scheduleDraw();
     }
 
     isDrawing = false;
@@ -466,21 +542,24 @@
   }
 
   canvas.addEventListener('mouseup', endDraw);
+  document.addEventListener('mouseup', endDraw);
   canvas.addEventListener('mouseleave', (e) => {
     endDraw(e);
     hoverCell = null;
-    draw();
+    scheduleDraw();
   });
 
   // Zoom with scroll
   canvasArea.addEventListener('wheel', (e) => {
     e.preventDefault();
+    const maxZoom = getMaxVisibleZoom();
     if (e.deltaY < 0) {
-      zoom = Math.min(8, zoom * 1.15);
+      zoom = Math.min(maxZoom, zoom * 1.15);
     } else {
       zoom = Math.max(0.25, zoom / 1.15);
     }
     updateZoomLabel();
+    clampPan();
     resizeCanvas();
   }, { passive: false });
 
@@ -610,6 +689,7 @@
       return mappedRow;
     });
     doneColors.clear();
+    pixelsDirty = true;
     draw();
     buildStitchTracker();
   }
@@ -873,6 +953,7 @@
           row.querySelector('.stitch-check').textContent = '✓';
         }
         updateStitchProgress();
+        pixelsDirty = true;
         draw();
       });
       tracker.appendChild(row);
@@ -889,18 +970,22 @@
 
   // Zoom buttons
   document.getElementById('zoomIn').addEventListener('click', () => {
-    zoom = Math.min(8, zoom * 1.25);
+    zoom = Math.min(getMaxVisibleZoom(), zoom * 1.25);
     updateZoomLabel();
+    clampPan();
     resizeCanvas();
   });
   document.getElementById('zoomOut').addEventListener('click', () => {
     zoom = Math.max(0.25, zoom / 1.25);
     updateZoomLabel();
+    clampPan();
     resizeCanvas();
   });
   document.getElementById('zoomFit').addEventListener('click', () => {
     zoom = 1;
     updateZoomLabel();
+    panX = 0;
+    panY = 0;
     resizeCanvas();
   });
 
@@ -1788,6 +1873,7 @@ td,.ax,.leg-swatch{-webkit-print-color-adjust:exact!important;print-color-adjust
     importOverlay.classList.remove('visible');
     importedImage = null;
     doneColors.clear();
+    pixelsDirty = true;
     resizeCanvas();
     buildStitchTracker();
   });
