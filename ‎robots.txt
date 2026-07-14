@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https:/stitchel.github.io/Stitchel/sitemap.xml
+Sitemap: https://stitchel.github.io/Stitchel/sitemap.xml
