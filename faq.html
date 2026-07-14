@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stitchel FAQ — How to Turn a Photo into a Cross Stitch Pattern</title>
+<meta name="description" content="Frequently asked questions about Stitchel, the free tool that turns any photo into a printable cross stitch or pixel art pattern mapped to DMC floss. Learn how to import, size, and export your pattern.">
+<link rel="canonical" href="https://stitchel.github.io/Stitchel/faq.html">
+<meta property="og:title" content="Stitchel FAQ — Photo to Cross Stitch Pattern Maker">
+<meta property="og:description" content="How to turn a photo into a printable cross stitch pattern with Stitchel. Free, no signup, in-browser.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://stitchel.github.io/Stitchel/faq.html">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/styles.css?v=16">
+<style>
+  /* Page-specific: FAQ is a normal scrolling document, not the full-viewport app */
+  body { height: auto; min-height: 100vh; overflow: auto; }
+  .faq-wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px 72px; }
+  .faq-back { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 700; margin-bottom: 28px; }
+  .faq-back:hover { color: var(--accent-hover); }
+  .header-actions .btn { text-decoration: none; }
+  .faq-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 12px; letter-spacing: 0.3px; }
+  .faq-intro { color: var(--text-muted); line-height: 1.65; font-size: 13px; margin-bottom: 28px; }
+  .faq-item { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); margin-bottom: 8px; overflow: hidden; }
+  .faq-item summary { cursor: pointer; padding: 14px 16px; font-size: 13px; font-weight: 700; color: var(--text); list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after { content: "+"; color: var(--accent); font-size: 18px; font-weight: 700; flex-shrink: 0; }
+  .faq-item[open] summary::after { content: "−"; }
+  .faq-item[open] { box-shadow: var(--shadow); }
+  .faq-answer { padding: 0 16px 16px; color: var(--text-muted); line-height: 1.65; font-size: 13px; }
+  .faq-answer strong { color: var(--text); font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-icon"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    Stitchel
+  </div>
+  <div class="header-actions">
+    <a class="btn" href="index.html">Back to editor</a>
+  </div>
+</header>
+
+<main class="faq-wrap">
+  <a class="faq-back" href="index.html">← Back to Stitchel</a>
+  <h1 class="faq-title">How to turn a photo in to a cross stitch pattern</h1>
+  <p class="faq-intro">
+    Stitchel is a free, in-browser tool that converts any photo into a printable cross
+    stitch or pixel art pattern. Import an image and Stitchel maps each color to DMC
+    embroidery floss, builds a stitch-by-stitch chart, tracks your progress, and exports
+    a PDF pattern or PNG — no signup, nothing to install.
+  </p>
+
+  <details class="faq-item" open>
+    <summary>How do I convert a photo into a cross stitch pattern?</summary>
+    <div class="faq-answer">
+      Click <strong>Import</strong>, choose a photo, then set the pattern size in stitches
+      and confirm. Stitchel pixelates the image and snaps each pixel to a color from your
+      chosen palette. Switch to <strong>Pattern</strong> mode to see the full stitch chart,
+      then <strong>Save as PDF</strong> to print it.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Is Stitchel free?</summary>
+    <div class="faq-answer">
+      Yes. Stitchel is completely free with no account or signup required. It runs entirely
+      in your browser, so your photos never leave your device.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>What is DMC floss, and how does color matching work?</summary>
+    <div class="faq-answer">
+      DMC is the most widely used brand of cross stitch embroidery thread, with each shade
+      identified by a number. Pick the <strong>DMC Thread</strong> palette and Stitchel
+      matches every color in your image to the closest real DMC floss number, so you can buy
+      the exact threads your pattern needs.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Can I build my own color palette?</summary>
+    <div class="faq-answer">
+      Yes. Click the <strong>+</strong> next to the palette selector to create a custom
+      palette. Add colors by DMC number or hex code, name the palette, and reuse it across
+      projects.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>What size should I make my cross stitch pattern?</summary>
+    <div class="faq-answer">
+      Size is measured in stitches. Smaller patterns (around 32×32) stitch up quickly and
+      suit simple images; larger patterns (100×100 or more) capture more detail but take
+      longer. You can set any size between 16 and 600 stitches on import.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Can I track my stitching progress?</summary>
+    <div class="faq-answer">
+      Yes. In Pattern mode, the built-in <strong>Stitch Tracker</strong> lets you mark
+      stitches complete and shows how many remain, so you can pick up where you left off.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>Can I use Stitchel on my phone?</summary>
+    <div class="faq-answer">
+      Yes — Stitchel works on mobile for importing a photo and previewing your pattern.
+      For the full editor with drawing tools, a computer works best.
+    </div>
+  </details>
+
+  <details class="faq-item">
+    <summary>How do I export or print my pattern?</summary>
+    <div class="faq-answer">
+      Use <strong>Pattern</strong> then <strong>Save as PDF</strong> for a printable chart
+      with a color-to-DMC key, or <strong>PNG</strong> to export the pixel art as an image.
+    </div>
+  </details>
+
+  <details class="faq-item">
+  <summary>Have feedback or a question?</summary>
+  <div class="faq-answer">
+    We'd love to hear it. Whether you've found a bug, want to request a feature, or
+    just have a question about how something works, send it our way through the
+    <strong><a href="https://docs.google.com/forms/d/e/1FAIpQLSe4hf3BldM_hMr7b-TSUjwblDpYzKGfjF9lZdkdd1wYcKbIjg/viewform?usp=send_form" target="_blank" rel="noopener noreferrer">feedback form</a></strong>.
+    It's the fastest way to reach us.
+  </div>
+</details>
+
+
+</main>
+</body>
+</html>

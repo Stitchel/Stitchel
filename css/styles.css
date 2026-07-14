@@ -104,8 +104,6 @@ header {
 }
 
 .feedback-link {
-  align-self: flex-end;
-  margin-top: auto;
   padding: 0;
   color: var(--accent);
   text-decoration: none;
@@ -120,7 +118,23 @@ header {
   color: var(--accent-hover);
 }
 
+.sidebar-links {
+  align-self: flex-end;
+  margin-top: auto;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.sidebar-links .feedback-link {
+  margin-top: 0;
+}
+
 body.pattern-mode .feedback-link {
+  display: none;
+}
+
+body.pattern-mode .sidebar-links {
   display: none;
 }
 
